@@ -1,6 +1,7 @@
 """Main calculation driver module of CIpy."""
 
 import numpy as np
+from importlib import import_module
 from fcipy.interfaces import load_pyscf_integrals, load_gamess_integrals
 
 class Driver:
@@ -25,10 +26,19 @@ class Driver:
         self.total_energy = None
         self.det = None
         self.ndet = 0
+        self.N_int = int(np.floor(self.system.norbitals / 64) + 1)
 
-    def load_determinants(self, file):
+    def load_determinants(self, file=None, method=None, target_irrep=None):
         from fcipy.determinants import read_determinants
-        self.det = read_determinants(file)
+        if file is not None:
+            self.det = read_determinants(file)
+        else:
+            # import the specific CC method module and get its update function
+            mod = import_module("fcipy.determinants")
+            det_function = getattr(mod, method.lower())
+            self.det = det_function(self.system, target_irrep)
+
+        assert self.N_int == self.det.shape[0]
         self.ndet = self.det.shape[2]
 
     def run_ci(self, nroot):

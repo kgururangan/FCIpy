@@ -1,0 +1,38 @@
+import numpy as np
+from pyscf import gto, scf, fci
+from fcipy.driver import Driver 
+
+def test_fci_h4():
+
+        Re = 1.0
+
+        geom = [['H', (-2*Re, -Re, 0.000)],
+                ['H', (-2*Re,  Re, 0.000)],
+                ['H', (Re, -Re, 0.000)],
+                ['H', (Re,  Re, 0.000)]]
+
+        mol = gto.M(atom=geom, basis="dz", symmetry="D2H", spin=0, charge=0, unit="Bohr")
+        mf = scf.RHF(mol)
+        mf.kernel()
+
+        #
+        # create an FCI solver based on the SCF object
+        #
+        # cisolver = fci.FCI(mf)
+        # print('E(FCI) = %.12f' % cisolver.kernel()[0])
+
+        driver = Driver.from_pyscf(mf, nfrozen=0)
+        driver.system.print_info()
+
+        driver.load_determinants(method="fci", target_irrep="AG")
+
+        driver.run_ci(nroot=1)
+
+        #
+        # Check the results
+        #
+        # print("Got = ", driver.total_energy[0], "Expected = ", -2.182052826416)
+        assert np.allclose(driver.total_energy[0], -2.182052826416, atol=1.0e-07)
+
+if __name__ == "__main__":
+        test_fci_h4()
