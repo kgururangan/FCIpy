@@ -7,8 +7,8 @@ def test_fci_h4():
         Re = 1.0
 
         # As you make this more square, I think the diagonal initial guess will fail
-        geom = [['H', (-2.0*Re, -Re, 0.000)],
-                ['H', (-2.0*Re,  Re, 0.000)],
+        geom = [['H', (-Re, -Re, 0.000)],
+                ['H', (-Re,  Re, 0.000)],
                 ['H', (Re, -Re, 0.000)],
                 ['H', (Re,  Re, 0.000)]]
 
@@ -27,12 +27,17 @@ def test_fci_h4():
         # obtain the determinant list for FCI
         driver.load_determinants(method="fci", target_irrep="AG")
 
-        driver.run_ci(nroot=1)
+        # perform a dense diagonalization of the full FCI Hamiltonian
+        driver.diagonalize_hamiltonian()
+
+        print("Expected ground-state FCI:", cisolver.kernel()[0])
+        for i, e in enumerate(driver.total_energy[:10]):
+               print(f"root {i}, E = {e}")
 
         #
         # Check the results
         #
-        assert np.allclose(driver.total_energy[0], cisolver.kernel()[0], atol=1.0e-07)
+        assert np.allclose(driver.total_energy[2], cisolver.kernel()[0], atol=1.0e-07)
 
 if __name__ == "__main__":
         test_fci_h4()

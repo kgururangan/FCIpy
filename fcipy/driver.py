@@ -26,6 +26,7 @@ class Driver:
         self.total_energy = None
         self.det = None
         self.ndet = 0
+        self.Hmat = None
         self.N_int = int(np.floor(self.system.norbitals / 64) + 1)
 
     def load_determinants(self, file=None, method=None, target_irrep=None):
@@ -46,6 +47,17 @@ class Driver:
         self.coef = np.zeros((self.ndet, nroot))
         self.total_energy = np.zeros(nroot)
         self.total_energy, self.coef = run_davidson(self.system, self.det, self.e1int, self.e2int, nroot)
+
+    def build_hamiltonian(self):
+        from fcipy.lib import ci
+        self.Hmat = ci.ci.build_hamiltonian(self.det, self.e1int, self.e2int,
+                                            self.system.noccupied_alpha, self.system.noccupied_beta)
+
+    def diagonalize_hamiltonian(self):
+        if self.Hmat is None:
+            self.build_hamiltonian()
+        self.total_energy, self.coef = np.linalg.eigh(self.Hmat)
+        self.total_energy += self.system.nuclear_repulsion
 
 
 
