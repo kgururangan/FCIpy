@@ -1,4 +1,4 @@
-"""Main calculation driver module of CIpy."""
+"""Main calculation driver module of FCIpy."""
 
 import numpy as np
 from fcipy.interfaces import load_pyscf_integrals, load_gamess_integrals
@@ -29,6 +29,9 @@ class Driver:
         self.N_int = int(np.floor(self.system.norbitals / 64) + 1)
         self.num_alpha = 0
         self.num_beta = 0
+        self.rdm1 = [None for _ in range(100)]
+        self.nat_orb = [None for _ in range(100)]
+        self.nat_occ_num = [None for _ in range(100)]
 
     def load_determinants(self, file=None, max_excit_rank=-1, target_irrep=None):
         from fcipy.determinants import read_determinants
@@ -60,5 +63,10 @@ class Driver:
         self.total_energy, self.coef = np.linalg.eigh(self.Hmat)
         self.total_energy += self.system.nuclear_repulsion
 
-
+    def one_e_density_matrix(self):
+        from fcipy.density import compute_rdm1
+        for i in range(self.coef.shape[1]):
+            self.rdm1[i] = compute_rdm1(self.det, self.coef[:, i], self.system.norbitals)
+            self.nat_occ_num[i], self.nat_orb[i] = np.linalg.eig(self.rdm1[i])
+        
 

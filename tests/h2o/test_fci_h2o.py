@@ -26,6 +26,13 @@ def test_fci_h2o():
     # run CI calculation
     driver.run_ci(nroot=1)
 
+    # compute the 1-RDM
+    driver.one_e_density_matrix()
+
+    print("Natural occupation numbers:")
+    for i, n in enumerate(driver.nat_occ_num[0]):
+        print(f"Orbital {i + 1}: {n}")
+
     # check the results
     assert np.allclose(driver.total_energy[0], cisolver.kernel(frozen=0)[0])
 
