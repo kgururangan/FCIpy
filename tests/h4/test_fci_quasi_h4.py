@@ -20,24 +20,25 @@ def test_fci_h4():
         # create an FCI solver based on the SCF object
         #
         cisolver = fci.FCI(mf)
+        cisolver.kernel(nroots=10)
 
         driver = Driver.from_pyscf(mf, nfrozen=0)
         driver.system.print_info()
 
         # obtain the determinant list for FCI
-        driver.load_determinants(method="fci", target_irrep="AG")
+        driver.load_determinants(max_excit_rank=-1, target_irrep="AG")
 
         # perform a dense diagonalization of the full FCI Hamiltonian
         driver.diagonalize_hamiltonian()
 
-        print("Expected ground-state FCI:", cisolver.kernel()[0])
-        for i, e in enumerate(driver.total_energy[:10]):
+        for i, e in enumerate(driver.total_energy[:20]):
                print(f"root {i}, E = {e}")
+        print("FCI energies from PySCF:", cisolver.e_tot)
 
         #
         # Check the results
         #
-        assert np.allclose(driver.total_energy[2], cisolver.kernel()[0], atol=1.0e-07)
+        assert np.allclose(driver.total_energy[0], cisolver.e_tot[0], atol=1.0e-07)
 
 if __name__ == "__main__":
         test_fci_h4()

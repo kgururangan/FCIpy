@@ -73,6 +73,9 @@ module ci
                            do jdet=1,ndet
                               hmatel = 0.0d0
                               call get_excitation(det(:,:,idet),det(:,:,jdet),exc,degree,phase,N_int)
+                              
+                              if (degree > 2) cycle
+                              
                               if (degree==0) then
                                  call slater0(occ,noa,nob,mo_num,e1int,e2int,hmatel)
                               else if (degree==1) then
@@ -80,14 +83,57 @@ module ci
                               else if (degree==2) then
                                  call slater2(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
                               end if
+                              
                               sigma(idet) = sigma(idet)+hmatel*coef(jdet)
                            end do
                            !print*, "idet = ", idet, "sigma = ", sigma(idet)
                         end do
-                end subroutine calc_sigma
+               end subroutine calc_sigma
+           
+!               subroutine calc_sigma_opt(det,N_int,ndet,num_alpha,num_beta,&
+!                                         e1int,e2int,mo_num,&
+!                                         noa,nob,&
+!                                         coef,&
+!                                         sigma)
+!
+!                        integer, intent(in) :: N_int, ndet, mo_num, noa, nob, num_alpha, num_beta
+!                        integer*8, intent(in) :: det(N_int,2,ndet)
+!                        double precision, intent(in) :: e1int(mo_num,mo_num)
+!                        double precision, intent(in) :: e2int(mo_num,mo_num,mo_num,mo_num)
+!                        double precision, intent(in) :: coef(ndet)
+!                        !
+!                        double precision, intent(out) :: sigma(ndet)
+!                        !
+!                        integer :: idet, jdet
+!                        integer :: occ(noa,2)
+!                        double precision :: hmatel, phase
+!                        integer :: exc(0:2,2,2)
+!                        integer :: degree
+!                        integer*8 :: buffer(N_int,2,ndet)
+!                        integer, allocatable :: loc_arr(:,:), idx(:)
+!
+!                        sigma = 0.0d0
+!
+!                        !
+!                        ! alpha-alpha loop
+!                        !
+!                        ! copy determinants into buffer
+!                        buffer(:,:,:) = det(:,:,:)
+!                        ! sort determinants into blocks according to beta string
+!                        allocate(loc_arr(num_beta,2),idx(num_beta))
+!                        do idet=1,ndet
+!
+!                           call get_occupied(det(:,:,idet), N_int, noa, occ)
+!
+!                           beta = det(:,2,idet)
+!                           do jdet=loc_arr(idx(beta),1),loc_arr(idx(beta),2)
+!
+!                           end do
+!                        end do
+!               end subroutine calc_sigma_opt
 
 
-                subroutine build_hamiltonian(det,N_int,ndet,e1int,e2int,mo_num,noa,nob,hmat)
+               subroutine build_hamiltonian(det,N_int,ndet,e1int,e2int,mo_num,noa,nob,hmat)
 
                     integer, intent(in)    :: N_int
                     integer, intent(in) :: ndet
@@ -125,9 +171,9 @@ module ci
                       end do
                     end do
 
-                end subroutine build_hamiltonian
+               end subroutine build_hamiltonian
 
-                subroutine i_H_j(I,J,N_int,e1int,e2int,mo_num,noa,nob,hmatel)
+               subroutine i_H_j(I,J,N_int,e1int,e2int,mo_num,noa,nob,hmatel)
                     integer, intent(in)    :: N_int
                     integer, intent(in) :: mo_num, noa, nob
                     integer*8, intent(in)  :: I(N_int,2), J(N_int,2)
@@ -153,7 +199,7 @@ module ci
                     else if (degree==2) then
                        call slater2(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
                     end if
-                end subroutine i_H_j
+               end subroutine i_H_j
 
                 subroutine get_occupied(det,Nint,noa,occ)
                   implicit none
