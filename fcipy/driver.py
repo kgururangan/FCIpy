@@ -44,8 +44,6 @@ class Driver:
 
     def run_ci(self, nroot):
         from fcipy.davidson import run_davidson
-        self.coef = np.zeros((self.ndet, nroot))
-        self.total_energy = np.zeros(nroot)
         self.total_energy, self.coef = run_davidson(self.system, self.det, self.e1int, self.e2int, nroot)
 
     def build_hamiltonian(self):
