@@ -1,5 +1,6 @@
 import time
 import numpy as np
+#from numba import njit
 from fcipy.excitations import get_excitation_degree
 
 def read_determinants(file):
@@ -15,6 +16,19 @@ def read_determinants(file):
     # Reshape the array in Fortran order (F order is important!)
     det = np.reshape(det, (N_int, 2, ndet), order="F")
     return det
+
+def det_from_occ(occ, N_int):
+    I = np.zeros(N_int, dtype=np.int64)
+    for n in occ:
+        I[n // 64] += 2**(n % 64)
+    return I
+
+def det_symmetry(occ, system):
+    sym = 0
+    for i, n in enumerate(occ):
+        sym_n = system.point_group_irrep_to_number[system.orbital_symmetries[n]]
+        sym = sym ^ sym_n
+    return sym
 
 def check_symmetry(sym_alpha, sym_beta, sym_target):
     if sym_target == -1:
@@ -45,12 +59,8 @@ def fci_space(system, max_excit_rank, target_irrep):
     ndet = get_fci_space_dimension(system, max_excit_rank, target_irrep)
 
     # Hartree-Fock determinant
-    I_a_ref = np.zeros(N_int, dtype=np.int64)
-    for n in range(system.noccupied_alpha):
-        I_a_ref[n // 64] += 2 ** (n % 64)
-    I_b_ref = np.zeros(N_int, dtype=np.int64)
-    for n in range(system.noccupied_beta):
-        I_b_ref[n // 64] += 2 ** (n % 64)
+    I_a_ref = det_from_occ(list(range(system.noccupied_alpha)), N_int)
+    I_b_ref = det_from_occ(list(range(system.noccupied_beta)), N_int)
 
     print("   Reference determinant = ", (I_a_ref, I_b_ref))
     print("   Dimension of CI space = ", ndet)
@@ -60,35 +70,23 @@ def fci_space(system, max_excit_rank, target_irrep):
     kout = 0
     for alpha in combinations(orbs, system.noccupied_alpha):
 
-        sym_a = 0
-        for i, a in enumerate(alpha):
-            sym = system.point_group_irrep_to_number[system.orbital_symmetries[a]]
-            sym_a = sym_a ^ sym
-
-        I_a = np.zeros(N_int, dtype=np.int64)
-        for n in alpha:
-            I_a[n // 64] += 2**(n % 64)
-
+        I_a = det_from_occ(alpha, N_int)
         degree_a = get_excitation_degree(I_a, I_a_ref)
+        sym_a = det_symmetry(alpha, system)
+
+        if degree_a > max_excit_rank: continue
 
         for beta in combinations(orbs, system.noccupied_beta):
 
-            sym_b = 0
-            for i, b in enumerate(beta):
-                sym = system.point_group_irrep_to_number[system.orbital_symmetries[b]]
-                sym_b = sym_b ^ sym
-
-            I_b = np.zeros(N_int, dtype=np.int64)
-            for n in beta:
-                I_b[n // 64] += 2 ** (n % 64)
+            I_b = det_from_occ(beta, N_int)
             degree_b = get_excitation_degree(I_b, I_b_ref)
+            sym_b = det_symmetry(beta, system)
 
-            degree = degree_a + degree_b
-
-            if check_symmetry(sym_a, sym_b, sym_target) and degree <= max_excit_rank:
+            if check_symmetry(sym_a, sym_b, sym_target) and degree_a + degree_b <= max_excit_rank:
                 det[:, 0, kout] = I_a
                 det[:, 1, kout] = I_b
                 kout += 1
+
     t_end = time.perf_counter()
     print(f"   Completed in {t_end - t_start} seconds\n")
     return det
@@ -105,44 +103,25 @@ def get_fci_space_dimension(system, max_excit_rank, target_irrep):
         max_excit_rank = system.nelectrons
 
     N_int = int(np.floor(system.norbitals / 64) + 1)
-
     # Hartree-Fock determinant
-    I_a_ref = np.zeros(N_int, dtype=np.int64)
-    for n in range(system.noccupied_alpha):
-        I_a_ref[n // 64] += 2 ** (n % 64)
-    I_b_ref = np.zeros(N_int, dtype=np.int64)
-    for n in range(system.noccupied_beta):
-        I_b_ref[n // 64] += 2 ** (n % 64)
-
+    I_a_ref = det_from_occ(list(range(system.noccupied_alpha)), N_int)
+    I_b_ref = det_from_occ(list(range(system.noccupied_beta)), N_int)
     orbs = np.arange(system.norbitals)
     kout = 0
     for alpha in combinations(orbs, system.noccupied_alpha):
 
-        sym_a = 0
-        for i, a in enumerate(alpha):
-            sym = system.point_group_irrep_to_number[system.orbital_symmetries[a]]
-            sym_a = sym_a ^ sym
-
-        I_a = np.zeros(N_int, dtype=np.int64)
-        for n in alpha:
-            I_a[n // 64] += 2**(n % 64)
-
+        I_a = det_from_occ(alpha, N_int)
         degree_a = get_excitation_degree(I_a, I_a_ref)
+        sym_a = det_symmetry(alpha, system)
+
+        if degree_a > max_excit_rank: continue
 
         for beta in combinations(orbs, system.noccupied_beta):
 
-            sym_b = 0
-            for i, b in enumerate(beta):
-                sym = system.point_group_irrep_to_number[system.orbital_symmetries[b]]
-                sym_b = sym_b ^ sym
-
-            I_b = np.zeros(N_int, dtype=np.int64)
-            for n in beta:
-                I_b[n // 64] += 2 ** (n % 64)
+            I_b = det_from_occ(beta, N_int)
             degree_b = get_excitation_degree(I_b, I_b_ref)
+            sym_b = det_symmetry(beta, system)
 
-            degree = degree_a + degree_b
-
-            if check_symmetry(sym_a, sym_b, sym_target) and degree <= max_excit_rank:
+            if check_symmetry(sym_a, sym_b, sym_target) and degree_a + degree_b <= max_excit_rank:
                 kout += 1
     return kout

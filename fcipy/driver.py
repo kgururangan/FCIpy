@@ -47,19 +47,32 @@ class Driver:
         # record number of unique alpha and beta strings
         self.num_alpha = len(np.unique(self.det[:, 0, :]))
         self.num_beta = len(np.unique(self.det[:, 1, :]))
+        print(f"   Number of unique alpha strings: {self.num_alpha}")
+        print(f"   Number of unique beta strings: {self.num_beta}")
 
-    def run_ci(self, nroot, convergence=1.0e-08, max_size=30, maxit=200):
-        from fcipy.davidson import run_davidson
-        self.total_energy, self.coef = run_davidson(self.system, self.det, self.e1int, self.e2int, nroot,
-                                                    convergence=convergence, max_size=max_size, maxit=maxit)
+    def print_determinants(self):
+        for idet in range(self.ndet):
+            print(f"determinant {idet + 1}: alpha = {self.det[:, 0, idet]}  beta = {self.det[:, 1, idet]}")
 
-    def build_hamiltonian(self):
-        from fcipy.hamiltonian import build_hamiltonian
-        self.Hmat = build_hamiltonian(self.det, self.e1int, self.e2int, self.system.noccupied_alpha, self.system.noccupied_beta)
+    def run_ci(self, nroot, convergence=1.0e-08, max_size=30, maxit=200, opt=True):
+        from fcipy.davidson import run_davidson, run_davidson_opt
+        if opt:
+            self.total_energy, self.coef = run_davidson_opt(self.system, self.det, self.num_alpha, self.num_beta, self.e1int, self.e2int, nroot,
+                                                       convergence=convergence, max_size=max_size, maxit=maxit)
+        else:
+            self.total_energy, self.coef = run_davidson(self.system, self.det, self.e1int, self.e2int, nroot,
+                                                        convergence=convergence, max_size=max_size, maxit=maxit)
 
-    def diagonalize_hamiltonian(self):
+    def build_hamiltonian(self, opt=True):
+        from fcipy.hamiltonian import build_hamiltonian, build_hamiltonian_opt
+        if opt:
+            self.det, self.Hmat = build_hamiltonian_opt(self.det, self.num_alpha, self.num_beta, self.e1int, self.e2int, self.system.noccupied_alpha, self.system.noccupied_beta)
+        else:
+            self.Hmat = build_hamiltonian(self.det, self.e1int, self.e2int, self.system.noccupied_alpha, self.system.noccupied_beta)
+
+    def diagonalize_hamiltonian(self, opt=True):
         if self.Hmat is None:
-            self.build_hamiltonian()
+            self.build_hamiltonian(opt=opt)
         self.total_energy, self.coef = np.linalg.eigh(self.Hmat)
         self.total_energy += self.system.nuclear_repulsion
 

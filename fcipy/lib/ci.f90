@@ -68,11 +68,58 @@ module ci
                         integer :: degree
 
                         sigma = 0.0d0
-                        !$omp parallel shared(sigma,&
-                        !$omp det,noa,nob,N_int,coef,&
-                        !$omp e1int,e2int,mo_num),&
-                        !$omp private(hmatel,occ,exc,degree,phase)
-                        !$omp do schedule(static)
+                        !
+                        ! Diagonal parts
+                        !
+                        do idet=1,ndet
+                           call get_occupied(det(:,:,idet), N_int, noa, occ)
+                           call slater0(occ,noa,nob,mo_num,e1int,e2int,hmatel)
+                           sigma(idet) = hmatel*coef(idet)
+                        end do
+                        !
+                        ! Off-Diagonal parts
+                        !
+                        do idet=1,ndet
+                           call get_occupied(det(:,:,idet), N_int, noa, occ)
+                           do jdet=idet+1,ndet
+                              hmatel = 0.0d0
+                              call get_excitation(det(:,:,idet),det(:,:,jdet),exc,degree,phase,N_int)
+                              
+                              if (degree > 2) cycle
+                              
+                              if (degree==1) then
+                                 call slater1(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
+                              else if (degree==2) then
+                                 call slater2(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
+                              end if
+                              
+                              sigma(idet) = sigma(idet)+hmatel*coef(jdet)
+                              sigma(jdet) = sigma(jdet)+hmatel*coef(idet)
+                           end do
+                        end do
+               end subroutine calc_sigma
+
+               subroutine calc_sigma_nonhermitian(det,N_int,ndet,&
+                                                  e1int,e2int,mo_num,&
+                                                  noa,nob,&
+                                                  coef,&
+                                                  sigma)
+
+                        integer, intent(in) :: N_int, ndet, mo_num, noa, nob
+                        integer*8, intent(in) :: det(N_int,2,ndet)
+                        double precision, intent(in) :: e1int(mo_num,mo_num)
+                        double precision, intent(in) :: e2int(mo_num,mo_num,mo_num,mo_num)
+                        double precision, intent(in) :: coef(ndet)
+                        !
+                        double precision, intent(out) :: sigma(ndet)
+                        !
+                        integer :: idet, jdet
+                        integer :: occ(noa,2)
+                        double precision :: hmatel, phase
+                        integer :: exc(0:2,2,2)
+                        integer :: degree
+
+                        sigma = 0.0d0
                         do idet=1,ndet
                            call get_occupied(det(:,:,idet), N_int, noa, occ)
                            do jdet=1,ndet
@@ -80,7 +127,7 @@ module ci
                               call get_excitation(det(:,:,idet),det(:,:,jdet),exc,degree,phase,N_int)
                               
                               if (degree > 2) cycle
-                              
+
                               if (degree==0) then
                                  call slater0(occ,noa,nob,mo_num,e1int,e2int,hmatel)
                               else if (degree==1) then
@@ -92,53 +139,133 @@ module ci
                               sigma(idet) = sigma(idet)+hmatel*coef(jdet)
                            end do
                         end do
-                        !$omp end do
-                        !$omp end parallel
-               end subroutine calc_sigma
+               end subroutine calc_sigma_nonhermitian
            
-!               subroutine calc_sigma_opt(det,N_int,ndet,num_alpha,num_beta,&
-!                                         e1int,e2int,mo_num,&
-!                                         noa,nob,&
-!                                         coef,&
-!                                         sigma)
-!
-!                        integer, intent(in) :: N_int, ndet, mo_num, noa, nob, num_alpha, num_beta
-!                        integer*8, intent(in) :: det(N_int,2,ndet)
-!                        double precision, intent(in) :: e1int(mo_num,mo_num)
-!                        double precision, intent(in) :: e2int(mo_num,mo_num,mo_num,mo_num)
-!                        double precision, intent(in) :: coef(ndet)
-!                        !
-!                        double precision, intent(out) :: sigma(ndet)
-!                        !
-!                        integer :: idet, jdet
-!                        integer :: occ(noa,2)
-!                        double precision :: hmatel, phase
-!                        integer :: exc(0:2,2,2)
-!                        integer :: degree
-!                        integer*8 :: buffer(N_int,2,ndet)
-!                        integer, allocatable :: loc_arr(:,:), idx(:)
-!
-!                        sigma = 0.0d0
-!
-!                        !
-!                        ! alpha-alpha loop
-!                        !
-!                        ! copy determinants into buffer
-!                        buffer(:,:,:) = det(:,:,:)
-!                        ! sort determinants into blocks according to beta string
-!                        allocate(loc_arr(num_beta,2),idx(num_beta))
-!                        do idet=1,ndet
-!
-!                           call get_occupied(det(:,:,idet), N_int, noa, occ)
-!
-!                           beta = det(:,2,idet)
-!                           do jdet=loc_arr(idx(beta),1),loc_arr(idx(beta),2)
-!
-!                           end do
-!                        end do
-!               end subroutine calc_sigma_opt
+               subroutine calc_sigma_opt(det,N_int,ndet,num_alpha,num_beta,&
+                                         e1int,e2int,mo_num,&
+                                         noa,nob,&
+                                         coef,&
+                                         sigma,&
+                                         e_diag)
 
+                        integer, intent(in) :: N_int, ndet, mo_num, noa, nob, num_alpha, num_beta
+                        double precision, intent(in) :: e1int(mo_num,mo_num)
+                        double precision, intent(in) :: e2int(mo_num,mo_num,mo_num,mo_num)
+                        !
+                        integer*8, intent(inout) :: det(N_int,2,ndet)
+                        !f2py intent(in,out) :: det(N_int,2,ndet)
+                        double precision, intent(inout) :: coef(ndet)
+                        !f2py intent(in,out) :: coef(ndet)
+                        double precision, intent(inout) :: e_diag(ndet)
+                        !f2py intent(in,out) :: e_diag(ndet)
 
+                        double precision, intent(out) :: sigma(ndet)
+                        !
+                        integer :: a1, a2, b1, b2, a, b
+                        integer :: idet, jdet
+                        integer :: occ(noa,2)
+                        double precision :: hmatel, phase
+                        integer :: exc(0:2,2,2)
+                        integer :: degree
+                        integer, allocatable :: loc_arr(:)
+
+                        !
+                        ! diagonal loop
+                        !
+                        do idet=1,ndet
+                           sigma(idet) = e_diag(idet)*coef(idet)
+                        end do
+                        !
+                        ! alpha-alpha loop
+                        !
+                        ! sort determinants into blocks according to beta string
+                        allocate(loc_arr(num_beta+1))
+                        call sort_determinants(sigma,coef,det,N_int,ndet,loc_arr,num_beta,2,e_diag)
+                        !
+                        do a=1,num_beta
+                           do b1=loc_arr(a),loc_arr(a+1)-1
+                              call get_occupied(det(:,:,b1), N_int, noa, occ)
+                              do b2=b1+1,loc_arr(a+1)-1
+                                 if (exc_degree(det(:,1,b1),det(:,1,b2),N_int) <= 2) then
+                                    ! b1 connected to b2 by a or aa excitation
+                                    call get_excitation(det(:,:,b1),det(:,:,b2),exc,degree,phase,N_int)
+                                    if (degree==1) then
+                                       call slater1(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
+                                       sigma(b1) = sigma(b1)+hmatel*coef(b2)
+                                       sigma(b2) = sigma(b2)+hmatel*coef(b1)
+                                    else if (degree==2) then
+                                       call slater2(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
+                                       sigma(b1) = sigma(b1)+hmatel*coef(b2)
+                                       sigma(b2) = sigma(b2)+hmatel*coef(b1)
+                                    end if
+                                 end if
+                              end do
+                           end do
+                        end do
+                        !print*, 'Checking beta spin buckets'
+                        !print*, '---------------------------'
+                        !call check_spin_buckets(N_int, ndet, num_beta, loc_arr, det)
+                        deallocate(loc_arr)
+                        !
+                        ! beta-beta loop
+                        !
+                        ! sort determinants into blocks according to alpha string
+                        allocate(loc_arr(num_alpha+1))
+                        call sort_determinants(sigma,coef,det,N_int,ndet,loc_arr,num_alpha,1,e_diag)
+                        !
+                        do a=1,num_alpha
+                           do b1=loc_arr(a),loc_arr(a+1)-1
+                              call get_occupied(det(:,:,b1), N_int, noa, occ)
+                              do b2=b1+1,loc_arr(a+1)-1
+                                 if (exc_degree(det(:,2,b1),det(:,2,b2),N_int) <= 2) then
+                                    ! b1 connected to b2 by b or bb excitation
+                                    call get_excitation(det(:,:,b1),det(:,:,b2),exc,degree,phase,N_int)
+                                    if (degree==1) then
+                                       call slater1(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
+                                       sigma(b1) = sigma(b1)+hmatel*coef(b2)
+                                       sigma(b2) = sigma(b2)+hmatel*coef(b1)
+                                    else if (degree==2) then
+                                       call slater2(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
+                                       sigma(b1) = sigma(b1)+hmatel*coef(b2)
+                                       sigma(b2) = sigma(b2)+hmatel*coef(b1)
+                                    end if
+                                 end if
+                              end do
+                           end do
+                        end do
+                        !print*, 'Checking alpha spin buckets'
+                        !print*, '---------------------------'
+                        !call check_spin_buckets(N_int, ndet, num_alpha, loc_arr, det)
+                        !
+                        ! alpha-beta loop
+                        !
+                        do a1=1,num_alpha
+                           do a2=a1+1,num_alpha
+                              ! get alpha excitation level between buckets
+                              if (exc_degree(det(:,1,loc_arr(a1)),det(:,1,loc_arr(a2)),N_int) /= 1) cycle
+                              do b1=loc_arr(a1),loc_arr(a1+1)-1
+                                 call get_occupied(det(:,:,b1), N_int, noa, occ)
+                                 do b2=loc_arr(a2),loc_arr(a2+1)-1
+                                    if (exc_degree(det(:,2,b1),det(:,2,b2),N_int) == 1) then
+                                       ! b1 connected to b2 by ab excitations
+                                       call get_excitation(det(:,:,b1),det(:,:,b2),exc,degree,phase,N_int)
+                                       call slater2(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
+                                       !print*, det(:,:,b1), det(:,:,b2)
+                                       sigma(b1) = sigma(b1)+hmatel*coef(b2)
+                                       sigma(b2) = sigma(b2)+hmatel*coef(b1)
+                                    end if
+                                 end do
+                              end do
+                           end do
+                        end do
+                        deallocate(loc_arr)
+
+                        !do idet=1,ndet
+                        !   print*,"OPT SIGMA(",idet,")=", sigma(idet)
+                        !end do
+
+               end subroutine calc_sigma_opt
+           
                subroutine build_hamiltonian(det,N_int,ndet,e1int,e2int,mo_num,noa,nob,hmat)
 
                     integer, intent(in)    :: N_int
@@ -173,11 +300,167 @@ module ci
                           call slater2(occ,noa,nob,mo_num,e1int,e2int,exc,phase,two)
                         end if
                         hmat(i,j)=zero+one+two
+                        !print*,det(:,:,i),det(:,:,j),zero+one+two
                         hmat(j,i)=hmat(i,j)
                       end do
                     end do
 
                end subroutine build_hamiltonian
+           
+               subroutine build_hamiltonian_opt(det,N_int,ndet,num_alpha,num_beta,&
+                                                e1int,e2int,mo_num,&
+                                                noa,nob,&
+                                                H)
+
+                        integer, intent(in) :: N_int, ndet, mo_num, noa, nob, num_alpha, num_beta
+                        double precision, intent(in) :: e1int(mo_num,mo_num)
+                        double precision, intent(in) :: e2int(mo_num,mo_num,mo_num,mo_num)
+                        !
+                        integer*8, intent(inout) :: det(N_int,2,ndet)
+                        !f2py intent(in,out) :: det(N_int,2,ndet)
+                        double precision, intent(out) :: H(ndet,ndet)
+                        !
+                        integer :: a1, a2, b1, b2, a, b
+                        integer :: idet, jdet
+                        integer :: occ(noa,2)
+                        double precision :: hmatel, phase
+                        integer :: exc(0:2,2,2)
+                        integer :: degree
+                        integer, allocatable :: loc_arr(:)
+                        !integer*8 :: det1, det2
+
+                        !
+                        ! diagonal loop
+                        !
+                        do idet=1,ndet
+                           hmatel = 0.0d0
+                           call get_occupied(det(:,:,idet), N_int, noa, occ)
+                           call slater0(occ,noa,nob,mo_num,e1int,e2int,hmatel)
+                           H(idet,idet) = hmatel
+                        end do
+                        !
+                        ! alpha-alpha loop
+                        !
+                        ! sort determinants into blocks according to beta string
+                        allocate(loc_arr(num_beta+1))
+                        call sort_determinants_simple(det,H,N_int,ndet,loc_arr,num_beta,2)
+                        !
+                        do a=1,num_beta
+                           do b1=loc_arr(a),loc_arr(a+1)-1
+                              call get_occupied(det(:,:,b1), N_int, noa, occ)
+                              do b2=b1+1,loc_arr(a+1)-1
+                                 if (exc_degree(det(:,1,b1),det(:,1,b2),N_int) <= 2) then
+                                    hmatel = 0.0d0
+                                    ! b1 connected to b2 by a or aa excitation
+                                    call get_excitation(det(:,:,b1),det(:,:,b2),exc,degree,phase,N_int)
+                                    if (degree==1) then
+                                       call slater1(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
+                                    else if (degree==2) then
+                                       call slater2(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
+                                    end if
+                                    H(b1,b2) = hmatel
+                                    H(b2,b1) = H(b1,b2)
+                                 end if
+                              end do
+                           end do
+                        end do
+                        !print*, 'Checking beta spin buckets'
+                        !print*, '---------------------------'
+                        !call check_spin_buckets(N_int, ndet, num_beta, loc_arr, det)
+                        deallocate(loc_arr)
+                        !
+                        ! beta-beta loop
+                        !
+                        ! sort determinants into blocks according to alpha string
+                        allocate(loc_arr(num_alpha+1))
+                        call sort_determinants_simple(det,H,N_int,ndet,loc_arr,num_alpha,1)
+                        !
+                        do a=1,num_alpha
+                           do b1=loc_arr(a),loc_arr(a+1)-1
+                              call get_occupied(det(:,:,b1), N_int, noa, occ)
+                              do b2=b1+1,loc_arr(a+1)-1
+                                 if (exc_degree(det(:,2,b1),det(:,2,b2),N_int) <= 2) then
+                                    hmatel = 0.0d0
+                                    ! b1 connected to b2 by b or bb excitation
+                                    call get_excitation(det(:,:,b1),det(:,:,b2),exc,degree,phase,N_int)
+                                    if (degree==1) then
+                                       call slater1(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
+                                    else if (degree==2) then
+                                       call slater2(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
+                                    end if
+                                    H(b1,b2) = hmatel
+                                    H(b2,b1) = H(b1,b2)
+                                 end if
+                              end do
+                           end do
+                        end do
+                        !print*, 'Checking alpha spin buckets'
+                        !print*, '---------------------------'
+                        !call check_spin_buckets(N_int, ndet, num_alpha, loc_arr, det)
+                        !
+                        ! alpha-beta loop
+                        !
+                        do a1=1,num_alpha
+                           do a2=a1+1,num_alpha
+                              ! get alpha excitation level between buckets
+                              if (exc_degree(det(:,1,loc_arr(a1)),det(:,1,loc_arr(a2)),N_int) /= 1) cycle
+                              do b1=loc_arr(a1),loc_arr(a1+1)-1
+                                 call get_occupied(det(:,:,b1), N_int, noa, occ)
+                                 do b2=loc_arr(a2),loc_arr(a2+1)-1
+                                    if (exc_degree(det(:,2,b1),det(:,2,b2),N_int) == 1) then
+                                       hmatel = 0.0d0
+                                       ! b1 connected to b2 by ab excitations
+                                       call get_excitation(det(:,:,b1),det(:,:,b2),exc,degree,phase,N_int)
+                                       call slater2(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
+                                       H(b1,b2) = hmatel
+                                       H(b2,b1) = H(b1,b2)
+                                    end if
+                                 end do
+                              end do
+                           end do
+                        end do
+                        deallocate(loc_arr)
+
+               end subroutine build_hamiltonian_opt
+           
+               subroutine build_hamiltonian_nonhermitian(det,N_int,ndet,e1int,e2int,mo_num,noa,nob,hmat)
+
+                    integer, intent(in)    :: N_int
+                    integer, intent(in) :: ndet
+                    integer, intent(in) :: mo_num, noa, nob
+                    integer*8, intent(in)  :: det(N_int,2,ndet)
+                    double precision, intent(in) :: e1int(mo_num,mo_num)
+                    double precision, intent(in) :: e2int(mo_num,mo_num,mo_num,mo_num)
+                    !
+                    double precision, intent(out) :: hmat(ndet,ndet)
+                    !
+                    integer          :: occ(noa,2)
+                    double precision :: zero, one, two
+                    double precision :: phase
+                    integer    :: exc(0:2,2,2)
+                    integer    :: degree
+                    integer :: i, j
+
+                    hmat=0.0
+                    do i=1,ndet
+                      call get_occupied(det(:,:,i), N_int, noa, occ)
+                      do j=1,ndet
+                        zero = 0.0
+                        one = 0.0
+                        two = 0.0
+                        call get_excitation(det(:,:,i),det(:,:,j),exc,degree,phase,N_int)
+                        if (degree==0) then
+                          call slater0(occ,noa,nob,mo_num,e1int,e2int,zero)
+                        else if (degree==1) then
+                          call slater1(occ,noa,nob,mo_num,e1int,e2int,exc,phase,one)
+                        else if (degree==2) then
+                          call slater2(occ,noa,nob,mo_num,e1int,e2int,exc,phase,two)
+                        end if
+                        hmat(i,j)=zero+one+two
+                      end do
+                    end do
+
+               end subroutine build_hamiltonian_nonhermitian
 
                subroutine i_H_j(I,J,N_int,e1int,e2int,mo_num,noa,nob,hmatel)
                     integer, intent(in)    :: N_int
@@ -592,6 +875,40 @@ module ci
 
                 end
 
+        integer function exc_degree(det1,det2,Nint)
+          !   Slater-Condon Rules
+          !   Copyright (C) 2013 Anthony Scemama <scemama@irsamc.ups-tlse.fr>
+          !                      Emmanuel Giner <emmanuel_giner_jr@hotmail.fr>
+          !
+          !   This program is free software; you can redistribute it and/or modify
+          !   it under the terms of the GNU General Public License as published by
+          !   the Free Software Foundation; either version 2 of the License, or
+          !   (at your option) any later version.
+          !
+          !   This program is distributed in the hope that it will be useful,
+          !   but WITHOUT ANY WARRANTY; without even the implied warranty of
+          !   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+          !   GNU General Public License for more details.
+          !
+          !   You should have received a copy of the GNU General Public License along
+          !   with this program; if not, write to the Free Software Foundation, Inc.,
+          !   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+          integer*8, intent(in)  :: det1(Nint), det2(Nint)
+          integer  , intent(in)  :: Nint
+
+          integer                :: l
+         
+          exc_degree = &
+              popcnt(xor( det1(1), det2(1)) )
+         
+          do l=2,Nint
+            exc_degree = exc_degree + &
+              popcnt(xor( det1(l), det2(l)) )
+          end do
+          exc_degree = ishft(exc_degree,-1)
+
+        end
+
         integer function n_excitations(det1,det2,Nint)
           !   Slater-Condon Rules
           !   Copyright (C) 2013 Anthony Scemama <scemama@irsamc.ups-tlse.fr>
@@ -691,5 +1008,173 @@ module ci
           end do
          end do
         end
+        
+        subroutine sort_determinants(sigma,coef,det,N_int,ndet,A,nloc,ispin,e_diag)
 
+              integer, intent(in) :: N_int, ndet, nloc, ispin
+
+              integer, intent(inout) :: A(nloc+1)
+              integer*8, intent(inout) :: det(N_int,2,ndet)
+              double precision, intent(inout) :: coef(ndet)
+              double precision, intent(inout) :: sigma(ndet)
+              double precision, intent(inout) :: e_diag(ndet)
+
+              integer :: j, p
+              integer :: idet, iloc, p1, p2
+              integer, allocatable :: idx(:)
+              double precision, allocatable :: temp(:)
+              
+              !!! ASSUMING N_int=1 !!!
+              j = 1
+
+              ! get the sorting array for ispin-major sorting (alpha or beta)
+              allocate(idx(ndet),temp(ndet))
+              call argsort_i8(det(j,ispin,:), idx)
+              ! apply sorting array to determinants, CI coefficients, and sigma array
+              det(j,:,:) = det(j,:,idx)
+              temp(:) = coef(:)
+              do p=1,ndet
+                 coef(p) = temp(idx(p))
+              end do
+              temp(:) = sigma(:)
+              do p=1,ndet
+                 sigma(p) = temp(idx(p))
+              end do
+              temp(:) = e_diag(:)
+              do p=1,ndet
+                 e_diag(p) = temp(idx(p))
+              end do
+              deallocate(idx,temp)
+              ! create array A, where A(n) marks the first occurence of a new spin bucket
+              iloc = 1
+              A(1) = 1
+              A(nloc+1) = ndet + 1
+              do idet=1,ndet-1
+                 ! get consecutive lexcial indices
+                 p1 = det(j,ispin,idet)
+                 p2 = det(j,ispin,idet+1)
+                 ! if change occurs between consecutive indices, record these locations in loc_arr as new start/end points
+                 if (p1 /= p2) then
+                    iloc = iloc+1
+                    A(iloc) = idet+1
+                 end if
+              end do
+      end subroutine sort_determinants
+      
+      subroutine sort_determinants_simple(det,H,N_int,ndet,A,nloc,ispin)
+
+              integer, intent(in) :: N_int, ndet, nloc, ispin
+
+              integer, intent(inout) :: A(nloc+1)
+              integer*8, intent(inout) :: det(N_int,2,ndet)
+              double precision, intent(inout) :: H(ndet,ndet)
+
+              integer :: j, p, q
+              integer :: idet, iloc, p1, p2
+              integer, allocatable :: idx(:)
+              double precision, allocatable :: htemp(:,:)
+              
+              !!! ASSUMING N_int=1 !!!
+              j = 1
+
+              ! get the sorting array for ispin-major sorting (alpha or beta)
+              allocate(idx(ndet),htemp(ndet,ndet))
+              call argsort_i8(det(j,ispin,:), idx)
+              ! apply sorting array to determinants, CI coefficients, and sigma array
+              det(j,:,:) = det(j,:,idx)
+              ! store old H matrix
+              htemp(:,:) = H(:,:)
+              do p=1,ndet
+                 do q=1,ndet
+                    !print*, 'hnew(',p,q,')=','hold(',idx(p),idx(q),')'
+                    H(p,q)=htemp(idx(p),idx(q))
+                    !H(idx(p),idx(q)) = H(p,q)
+                 end do
+              end do
+              deallocate(idx,htemp)
+              ! create array A, where A(n) marks the first occurence of a new spin bucket
+              iloc = 1
+              A(1) = 1
+              A(nloc+1) = ndet + 1
+              do idet=1,ndet-1
+                 ! get consecutive lexcial indices
+                 p1 = det(j,ispin,idet)
+                 p2 = det(j,ispin,idet+1)
+                 ! if change occurs between consecutive indices, record these locations in loc_arr as new start/end points
+                 if (p1 /= p2) then
+                    iloc = iloc+1
+                    A(iloc) = idet+1
+                 end if
+              end do
+      end subroutine sort_determinants_simple
+
+      subroutine argsort_i8(r,d)
+
+              integer*8, intent(in), dimension(:) :: r
+              integer, intent(out), dimension(size(r)) :: d
+
+              integer, dimension(size(r)) :: il
+
+              integer :: stepsize
+              integer :: i, j, n, left, k, ksize
+
+              n = size(r)
+
+              do i=1,n
+                 d(i)=i
+              end do
+
+              if (n==1) return
+
+              stepsize = 1
+              do while (stepsize < n)
+                 do left = 1, n-stepsize,stepsize*2
+                    i = left
+                    j = left+stepsize
+                    ksize = min(stepsize*2,n-left+1)
+                    k=1
+
+                    do while (i < left+stepsize .and. j < left+ksize)
+                       if (r(d(i)) < r(d(j))) then
+                          il(k) = d(i)
+                          i = i+1
+                          k = k+1
+                       else
+                          il(k) = d(j)
+                          j = j+1
+                          k = k+1
+                       endif
+                    enddo
+
+                    if (i < left+stepsize) then
+                       ! fill up remaining from left
+                       il(k:ksize) = d(i:left+stepsize-1)
+                    else
+                       ! fill up remaining from right
+                       il(k:ksize) = d(j:left+ksize-1)
+                    endif
+                    d(left:left+ksize-1) = il(1:ksize)
+                 end do
+                 stepsize = stepsize*2
+              end do
+
+      end subroutine argsort_i8
+   
+      subroutine check_spin_buckets( N_int, ndet, nloc, A, det )
+         
+            integer, intent(in) :: N_int, ndet, nloc
+            integer*8, intent(in) :: det(N_int,2,ndet)
+            integer, intent(in) :: A(nloc+1)
+            
+            integer :: b1, b2
+            
+            do b1=1,nloc
+               print*, 'spin bucket', b1
+               do b2=A(b1),A(b1+1)-1
+                  print*, det(1,:,b2)
+               end do
+            end do
+         
+      end subroutine check_spin_buckets
+   
 end module ci
