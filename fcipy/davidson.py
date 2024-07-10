@@ -48,9 +48,8 @@ def davidson(system, det, e1int, e2int, b, e, e_diag, tolerance, max_size, maxit
             is_converged = True
             break
         # DPR residual update
-        for i in range(ndim):
-            r[i] /= (e_diag[i] - e + 1.0e-09)
-        r /= np.linalg.norm(r)
+        r /= (e_diag - e + 1.0e-012)
+        # Orthogonalize residual against trial vectors
         for p in range(curr_size):
             b = B[:, p] / np.linalg.norm(B[:, p])
             r -= np.dot(b.T, r) * b
@@ -114,9 +113,8 @@ def davidson_opt(system, det, num_alpha, num_beta, e1int, e2int, b, e, e_diag, t
             is_converged = True
             break
         # DPR residual update
-        for i in range(ndim):
-            r[i] /= (e_diag[i] - e + 1.0e-09)
-        r /= np.linalg.norm(r)
+        r /= (e_diag - e + 1.0e-012)
+        # Orthogonalize residual against trial vectors
         for p in range(curr_size):
             b = B[:, p] / np.linalg.norm(B[:, p])
             r -= np.dot(b.T, r) * b
@@ -134,7 +132,7 @@ def davidson_opt(system, det, num_alpha, num_beta, e1int, e2int, b, e, e_diag, t
         print_dav_iteration(niter, e + system.nuclear_repulsion, resnorm, delta_e, elapsed_time)
         curr_size += 1
 
-    return e + system.nuclear_repulsion, v, is_converged
+    return det, e + system.nuclear_repulsion, v, is_converged
 
 # def block_davidson(system, det, e1int, e2int, b, e, e_diag, tolerance, max_size, maxit):
 #
@@ -258,7 +256,8 @@ def davidson_opt(system, det, num_alpha, num_beta, e1int, e2int, b, e, e_diag, t
 #
 #     return R, omega, is_converged
 
-def run_davidson(system, det, e1int, e2int, nroot, convergence, max_size, maxit):
+def run_davidson(system, det, e1int, e2int, nroot, convergence, max_size, maxit, print_thresh=0.09):
+
     ndim = det.shape[2]
     A_diag = ci.ci.calc_diagonal(det, system.noccupied_alpha, system.noccupied_beta, e1int, e2int)
     idx = np.argsort(A_diag)
@@ -274,26 +273,26 @@ def run_davidson(system, det, e1int, e2int, nroot, convergence, max_size, maxit)
         print("   CI calculation for root %d started on" % n, get_timestamp())
         print("\n   Energy of initial guess = {:>10.10f}".format(e0 + system.nuclear_repulsion))
         e[n], v[:, n], is_converged = davidson(system, det, e1int, e2int, b0, e0, A_diag, convergence, max_size, maxit)
-        dav_calculation_summary(e[n], is_converged, n, system, 0.09)
-
+        dav_calculation_summary(e[n], det, v[:, n], is_converged, n, system, print_thresh)
     return e, v
 
-def run_davidson_opt(system, det, num_alpha, num_beta, e1int, e2int, nroot, convergence, max_size, maxit):
-    ndim = det.shape[2]
-    A_diag = ci.ci.calc_diagonal(det, system.noccupied_alpha, system.noccupied_beta, e1int, e2int)
-    idx = np.argsort(A_diag)
+def run_davidson_opt(system, det, num_alpha, num_beta, e1int, e2int, nroot, convergence, max_size, maxit, print_thresh=0.09):
 
+    ndim = det.shape[2]
     e = np.zeros(nroot)
     v = np.zeros((ndim, nroot))
 
     for n in range(nroot):
+        A_diag = ci.ci.calc_diagonal(det, system.noccupied_alpha, system.noccupied_beta, e1int, e2int)
+        idx = np.argsort(A_diag)
         e0 = A_diag[idx[n]]
         b0 = np.zeros(ndim)
         b0[idx[n]] = 1.0
 
         print("   CI calculation for root %d started on" % n, get_timestamp())
+        print(f"   Number of unique alpha strings: {num_alpha}")
+        print(f"   Number of unique beta strings: {num_beta}")
         print("\n   Energy of initial guess = {:>10.10f}".format(e0 + system.nuclear_repulsion))
-        e[n], v[:, n], is_converged = davidson_opt(system, det, num_alpha, num_beta, e1int, e2int, b0, e0, A_diag, convergence, max_size, maxit)
-        dav_calculation_summary(e[n], is_converged, n, system, 0.09)
-
-    return e, v
+        det, e[n], v[:, n], is_converged = davidson_opt(system, det, num_alpha, num_beta, e1int, e2int, b0, e0, A_diag, convergence, max_size, maxit)
+        dav_calculation_summary(e[n], det, v[:, n], is_converged, n, system, print_thresh)
+    return det, e, v

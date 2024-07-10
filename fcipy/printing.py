@@ -1,3 +1,4 @@
+import numpy as np
 import datetime
 from fcipy.utilities import get_memory_usage
 
@@ -10,10 +11,38 @@ DAV_ITERATION_HEADER = ITERATION_HEADER_FMT.format(
     "Iter.", "Residuum", "E", "dE", "Wall time", "Memory"
 )
 
+def print_ci_amplitudes(system, det, coef, thresh):
+    from fcipy.lib import ci
+    noa = system.noccupied_alpha
+    nob = system.noccupied_beta
+    idx = np.argsort(np.abs(coef))
+    print("\n   Largest CI Amplitudes")
+    for n, i in enumerate(reversed(idx)):
+        if abs(coef[i]) < thresh: continue
+        occ = ci.ci.get_occupied(det[:, :, i], noa)
+        oa = [str(p) + "a" for p in occ[:noa, 0]]
+        ob = [str(p) + "b" for p in occ[:nob, 1]]
+        print(f"   [{n + 1}]    {oa}    {ob}     {coef[i]}")
+    return
+
+def print_ci_amplitudes_to_file(file, system, det, coef, thresh):
+    from fcipy.lib import ci
+    noa = system.noccupied_alpha
+    nob = system.noccupied_beta
+    idx = np.argsort(np.abs(coef))
+    with open(file, "w") as f:
+        for n, i in enumerate(reversed(idx)):
+            if abs(coef[i]) < thresh: continue
+            occ = ci.ci.get_occupied(det[:, :, i], noa)
+            oa = [str(p) + "a" for p in occ[:noa, 0]]
+            ob = [str(p) + "b" for p in occ[:nob, 1]]
+            f.write(f"   [{n + 1}]    {oa}    {ob}     {coef[i]}\n")
+    return
+
 def get_timestamp():
         return datetime.datetime.strptime(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "%Y-%m-%d %H:%M:%S")
 
-def dav_calculation_summary(energy, is_converged, istate, system, print_thresh):
+def dav_calculation_summary(energy, det, coef, is_converged, istate, system, print_thresh):
     DATA_FMT = "{:<30} {:>20.8f}"
     if is_converged:
         convergence_label = 'converged'
@@ -22,6 +51,7 @@ def dav_calculation_summary(energy, is_converged, istate, system, print_thresh):
     print("\n   CI Calculation Summary (%s) - Root %i" % (convergence_label, istate))
     print("  --------------------------------------------------")
     print(DATA_FMT.format("   Total energy", energy))
+    print_ci_amplitudes(system, det, coef, print_thresh)
     print("")
 
 def print_dav_iteration_header():

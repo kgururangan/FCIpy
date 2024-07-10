@@ -27,7 +27,7 @@ def test_fci_h4():
         # obtain the determinant list for FCI
         driver.load_determinants(max_excit_rank=-1, target_irrep="AG")
 
-        driver.run_ci(nroot=1)
+        driver.run_ci(nroot=3, prtol=0.01)
 
         #
         # Check the results
