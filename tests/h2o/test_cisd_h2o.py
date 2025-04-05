@@ -15,9 +15,9 @@ def test_cisd_h2o():
     #
     # create an CI solver based on the SCF object
     #
-    cisolver = ci.CISD(mf).run()
+    cisolver = ci.CISD(mf).run(frozen=1)
 
-    driver = Driver.from_pyscf(mf, nfrozen=0)
+    driver = Driver.from_pyscf(mf, nfrozen=1)
     driver.system.print_info()
 
     # read the determinants

@@ -148,6 +148,7 @@ class SystemPrinter:
             )
         print("")
         print(WHITESPACE, "Memory Usage =", get_memory_usage(), "MB")
+        print(WHITESPACE, "Frozen Core Energy =", self.system.frozen_energy)
         print(WHITESPACE, "Nuclear Repulsion Energy =", self.system.nuclear_repulsion)
         print(WHITESPACE, "Reference Energy =", self.system.reference_energy)
         print("")

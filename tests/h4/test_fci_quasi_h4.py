@@ -40,5 +40,6 @@ def test_fci_h4():
         #
         assert np.allclose(driver.total_energy[0], cisolver.e_tot[0], atol=1.0e-07)
 
+
 if __name__ == "__main__":
         test_fci_h4()

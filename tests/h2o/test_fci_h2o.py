@@ -17,24 +17,26 @@ def test_fci_h2o():
     #
     cisolver = fci.FCI(mf)
 
-    driver = Driver.from_pyscf(mf, nfrozen=0)
+    driver = Driver.from_pyscf(mf, nfrozen=1)
     driver.system.print_info()
 
     # read the determinants
     driver.load_determinants(max_excit_rank=-1, target_irrep="A1")
 
     # run CI calculation
-    driver.run_ci(nroot=1)
+    driver.run_ci(nroot=1, prtol=0.01)
+    #driver.diagonalize_hamiltonian()
+    print(driver.total_energy[0])
 
     # compute the 1-RDM
-    driver.one_e_density_matrix()
+    #driver.one_e_density_matrix()
 
-    print("Natural occupation numbers:")
-    for i, n in enumerate(driver.nat_occ_num[0]):
-        print(f"Orbital {i + 1}: {n}")
+    #print("Natural occupation numbers:")
+    #for i, n in enumerate(driver.nat_occ_num[0]):
+    #    print(f"Orbital {i + 1}: {n}")
 
     # check the results
-    assert np.allclose(driver.total_energy[0], cisolver.kernel(frozen=0)[0])
+    assert np.allclose(driver.total_energy[0], cisolver.kernel(frozen=1)[0])
 
 if __name__ == "__main__":
     test_fci_h2o()

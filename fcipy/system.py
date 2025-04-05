@@ -15,6 +15,7 @@ class System:
         charge=0,
         reference_energy=0.0,
         nuclear_repulsion=0.0,
+        frozen_energy=0.0,
         mo_energies=None,
         mo_occupation=None,
     ):
@@ -52,6 +53,7 @@ class System:
         self.mo_energies = mo_energies
         # reference energies
         self.reference_energy = reference_energy
+        self.frozen_energy = frozen_energy
         self.nuclear_repulsion = nuclear_repulsion
         # Get the point group symmetry of the reference state by exploiting
         # homomorphism between Abelian groups and binary vector spaces

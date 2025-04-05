@@ -173,6 +173,7 @@ module ci
                         ! diagonal loop
                         !
                         do idet=1,ndet
+                           ! sigma(I) <- <I|H|I>*I
                            sigma(idet) = e_diag(idet)*coef(idet)
                         end do
                         !
@@ -191,11 +192,15 @@ module ci
                                     call get_excitation(det(:,:,b1),det(:,:,b2),exc,degree,phase,N_int)
                                     if (degree==1) then
                                        call slater1(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
+                                       ! sigma(b1) <- <b1|H|b2>*c_b2
                                        sigma(b1) = sigma(b1)+hmatel*coef(b2)
+                                       ! sigma(b2) <- <b2|H|b1>*c_b1
                                        sigma(b2) = sigma(b2)+hmatel*coef(b1)
                                     else if (degree==2) then
                                        call slater2(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
+                                       ! sigma(b1) <- <b1|H|b2>*c_b2
                                        sigma(b1) = sigma(b1)+hmatel*coef(b2)
+                                       ! sigma(b2) <- <b2|H|b1>*c_b1
                                        sigma(b2) = sigma(b2)+hmatel*coef(b1)
                                     end if
                                  end if
@@ -222,11 +227,15 @@ module ci
                                     call get_excitation(det(:,:,b1),det(:,:,b2),exc,degree,phase,N_int)
                                     if (degree==1) then
                                        call slater1(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
+                                       ! sigma(b1) <- <b1|H|b2>*c_b2
                                        sigma(b1) = sigma(b1)+hmatel*coef(b2)
+                                       ! sigma(b2) <- <b2|H|b1>*c_b1
                                        sigma(b2) = sigma(b2)+hmatel*coef(b1)
                                     else if (degree==2) then
                                        call slater2(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
+                                       ! sigma(b1) <- <b1|H|b2>*c_b2
                                        sigma(b1) = sigma(b1)+hmatel*coef(b2)
+                                       ! sigma(b2) <- <b2|H|b1>*c_b1
                                        sigma(b2) = sigma(b2)+hmatel*coef(b1)
                                     end if
                                  end if
@@ -250,8 +259,9 @@ module ci
                                        ! b1 connected to b2 by ab excitations
                                        call get_excitation(det(:,:,b1),det(:,:,b2),exc,degree,phase,N_int)
                                        call slater2(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
-                                       !print*, det(:,:,b1), det(:,:,b2)
+                                       ! sigma(b1) <- <b1|H|b2>*c_b2
                                        sigma(b1) = sigma(b1)+hmatel*coef(b2)
+                                       ! sigma(b2) <- <b2|H|b1>*c_b1
                                        sigma(b2) = sigma(b2)+hmatel*coef(b1)
                                     end if
                                  end do
@@ -259,11 +269,6 @@ module ci
                            end do
                         end do
                         deallocate(loc_arr)
-
-                        !do idet=1,ndet
-                        !   print*,"OPT SIGMA(",idet,")=", sigma(idet)
-                        !end do
-
                end subroutine calc_sigma_opt
            
                subroutine build_hamiltonian(det,N_int,ndet,e1int,e2int,mo_num,noa,nob,hmat)
@@ -300,7 +305,6 @@ module ci
                           call slater2(occ,noa,nob,mo_num,e1int,e2int,exc,phase,two)
                         end if
                         hmat(i,j)=zero+one+two
-                        !print*,det(:,:,i),det(:,:,j),zero+one+two
                         hmat(j,i)=hmat(i,j)
                       end do
                     end do
@@ -853,7 +857,7 @@ module ci
                       nperm = nperm + popcnt(iand(det1(j,ispin),  &
                          iand( not(ishft(1_8,n+1))+1 ,ishft(1_8,m)-1)))
                     else
-                      nperm = nperm + popcnt(iand(det1(k,ispin),  & 
+                      nperm = nperm + popcnt(iand(det1(k,ispin),  &
                                              ishft(1_8,m)-1)) &
                                     + popcnt(iand(det1(j,ispin),  &
                                              not(ishft(1_8,n+1))+1))
@@ -1029,6 +1033,23 @@ module ci
 
               ! get the sorting array for ispin-major sorting (alpha or beta)
               allocate(idx(ndet),temp(ndet))
+!              do j=1,N_int
+!                 call argsort_i8(det(j,ispin,:), idx)
+!                 ! apply sorting array to determinants, CI coefficients, and sigma array
+!                 !det(j,:,:) = det(j,:,idx)
+!!                 temp(:) = coef(:)
+!!                 do p=1,ndet
+!!                    coef(p) = temp(idx(p))
+!!                 end do
+!!                 temp(:) = sigma(:)
+!!                 do p=1,ndet
+!!                    sigma(p) = temp(idx(p))
+!!                 end do
+!!                 temp(:) = e_diag(:)
+!!                 do p=1,ndet
+!!                    e_diag(p) = temp(idx(p))
+!!                 end do
+!              end do
               call argsort_i8(det(j,ispin,:), idx)
               ! apply sorting array to determinants, CI coefficients, and sigma array
               det(j,:,:) = det(j,:,idx)

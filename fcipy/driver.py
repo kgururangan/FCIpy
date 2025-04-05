@@ -65,7 +65,7 @@ class Driver:
             # for now, the sorting routine in the optimized CI requires that N_int = 1
             assert self.N_int == 1
             self.det, self.total_energy, self.coef = run_davidson_opt(self.system, self.det, self.num_alpha, self.num_beta, self.e1int, self.e2int, nroot,
-                                                       convergence=convergence, max_size=max_size, maxit=maxit, print_thresh=prtol)
+                                                                      convergence=convergence, max_size=max_size, maxit=maxit, print_thresh=prtol)
         else:
             self.total_energy, self.coef = run_davidson(self.system, self.det, self.e1int, self.e2int, nroot,
                                                         convergence=convergence, max_size=max_size, maxit=maxit, print_thresh=prtol)
@@ -75,7 +75,8 @@ class Driver:
         if opt:
             # for now, the sorting routine in the optimized CI requires that N_int = 1
             assert self.N_int == 1
-            self.det, self.Hmat = build_hamiltonian_opt(self.det, self.num_alpha, self.num_beta, self.e1int, self.e2int, self.system.noccupied_alpha, self.system.noccupied_beta)
+            print(self.det.shape)
+            self.det, self.Hmat = build_hamiltonian_opt(self.det, self.num_alpha, self.num_beta, self.e1int, self.e2int, self.system.noccupied_alpha, self.system.noccupied_beta, self.system.reference_energy)
         else:
             self.Hmat = build_hamiltonian(self.det, self.e1int, self.e2int, self.system.noccupied_alpha, self.system.noccupied_beta)
 
@@ -83,12 +84,14 @@ class Driver:
         if self.Hmat is None:
             self.build_hamiltonian(opt=opt)
         self.total_energy, self.coef = np.linalg.eigh(self.Hmat)
+        self.total_energy += self.system.frozen_energy
         self.total_energy += self.system.nuclear_repulsion
 
     def one_e_density_matrix(self):
         from fcipy.density import compute_rdm1
         for i in range(self.coef.shape[1]):
             self.rdm1[i] = compute_rdm1(self.det, self.coef[:, i], self.system.norbitals)
-            self.nat_occ_num[i], self.nat_orb[i] = np.linalg.eig(self.rdm1[i])
+            self.nat_occ_num[i], self.nat_orb[i] = np.linalg.eigh(self.rdm1[i])
+            #idx = np.argsort(self.nat_occ_num[i])
         
 

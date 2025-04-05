@@ -52,14 +52,21 @@ def load_pyscf_integrals(meanfield, nfrozen=0, ndelete=0):
     e2int = np.asfortranarray(e2int)
     # Check that the HF energy calculated using the integrals matches the PySCF result
     hf_energy = calc_hf_energy(e1int, e2int, system)
+    hf_frozen = calc_hf_frozen_energy(e1int, e2int, system)
+    #frozen_energy = hf_energy - hf_unfrozen
     hf_energy += nuclear_repulsion
 
     if not np.allclose(hf_energy, meanfield.energy_tot(), atol=1.0e-06, rtol=0.0):
         raise RuntimeError("Integrals don't match mean field energy")
 
     system.reference_energy = hf_energy
+    system.frozen_energy = hf_frozen
+    if system.nfrozen > 0:
+        K = np.einsum("ipiq->pq", e2int[:nfrozen, nfrozen:, :nfrozen, nfrozen:])
+        J = np.einsum("ipqi->pq", e2int[:nfrozen, nfrozen:, nfrozen:, :nfrozen])
+        e1int[nfrozen:, nfrozen:] += 2*K - J
 
-    return system, e1int, e2int
+    return system, e1int[nfrozen:, nfrozen:], e2int[nfrozen:, nfrozen:, nfrozen:, nfrozen:]
 
 def load_gamess_integrals(
     logfile=None,
@@ -118,12 +125,15 @@ def load_gamess_integrals(
 
     # Check that the HF energy calculated using the integrals matches the GAMESS result
     hf_energy = calc_hf_energy(e1int, e2int, system)
+    hf_frozen = calc_hf_frozen_energy(e1int, e2int, system)
+    #frozen_energy = hf_energy - hf_unfrozen
     hf_energy += system.nuclear_repulsion
     assert np.allclose(
         hf_energy, get_reference_energy(logfile), atol=1.0e-06, rtol=0.0
     )
     system.reference_energy = hf_energy
-    return system, e1int, e2int
+    system.frozen_energy = hf_frozen
+    return system, e1int[nfrozen:, nfrozen:], e2int[nfrozen:, nfrozen:, nfrozen:, nfrozen:]
 
 def get_reference_energy(gamess_logfile):
 
@@ -342,3 +352,29 @@ def calc_hf_energy(e1int, e2int, system):
     hf_energy = e1a + e1b + e2a + e2b + e2c
 
     return hf_energy
+
+def calc_hf_frozen_energy(e1int, e2int, system):
+
+    occ_a = slice(0, system.nfrozen)
+    occ_b = slice(0, system.nfrozen)
+    Nf = system.nfrozen
+
+    # e1a = np.einsum("ii->", e1int[occ_a, occ_a])
+    # e1b = np.einsum("ii->", e1int[occ_b, occ_b])
+    # e2a = 0.5 * (
+    #     np.einsum("ijij->", e2int[occ_a, occ_a, occ_a, occ_a])
+    #     - np.einsum("ijji->", e2int[occ_a, occ_a, occ_a, occ_a])
+    # )
+    # e2b = np.einsum("ijij->", e2int[occ_a, occ_b, occ_a, occ_b])
+    # e2c = 0.5 * (
+    #     np.einsum("ijij->", e2int[occ_b, occ_b, occ_b, occ_b])
+    #     - np.einsum("ijji->", e2int[occ_b, occ_b, occ_b, occ_b])
+    # )
+
+    hf_frozen = 2 * np.trace(e1int[:Nf, :Nf]) + \
+          2 * np.einsum('ijij', e2int[:Nf, :Nf, :Nf, :Nf]) - \
+          np.einsum('ijji', e2int[:Nf, :Nf, :Nf, :Nf])
+
+    #hf_frozen = e1a + e1b + e2a + e2b + e2c
+
+    return hf_frozen
