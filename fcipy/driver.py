@@ -71,14 +71,14 @@ class Driver:
                                                         convergence=convergence, max_size=max_size, maxit=maxit, print_thresh=prtol)
 
     def build_hamiltonian(self, opt=True):
-        from fcipy.hamiltonian import build_hamiltonian, build_hamiltonian_opt
-        if opt:
-            # for now, the sorting routine in the optimized CI requires that N_int = 1
-            assert self.N_int == 1
-            print(self.det.shape)
-            self.det, self.Hmat = build_hamiltonian_opt(self.det, self.num_alpha, self.num_beta, self.e1int, self.e2int, self.system.noccupied_alpha, self.system.noccupied_beta, self.system.reference_energy)
-        else:
-            self.Hmat = build_hamiltonian(self.det, self.e1int, self.e2int, self.system.noccupied_alpha, self.system.noccupied_beta)
+        from fcipy.hamiltonian import build_hamiltonian
+        # if opt:
+        #     # for now, the sorting routine in the optimized CI requires that N_int = 1
+        #     assert self.N_int == 1
+        #     print(self.det.shape)
+        #     self.det, self.Hmat = build_hamiltonian_opt(self.det, self.num_alpha, self.num_beta, self.e1int, self.e2int, self.system.noccupied_alpha, self.system.noccupied_beta, self.system.reference_energy)
+        # else:
+        self.Hmat = build_hamiltonian(self.det, self.e1int, self.e2int, self.system.noccupied_alpha, self.system.noccupied_beta)
 
     def diagonalize_hamiltonian(self, opt=True):
         if self.Hmat is None:
@@ -92,6 +92,4 @@ class Driver:
         for i in range(self.coef.shape[1]):
             self.rdm1[i] = compute_rdm1(self.det, self.coef[:, i], self.system.norbitals)
             self.nat_occ_num[i], self.nat_orb[i] = np.linalg.eigh(self.rdm1[i])
-            #idx = np.argsort(self.nat_occ_num[i])
-        
 

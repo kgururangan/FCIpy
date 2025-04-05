@@ -133,6 +133,11 @@ def load_gamess_integrals(
     )
     system.reference_energy = hf_energy
     system.frozen_energy = hf_frozen
+    if system.nfrozen > 0:
+        K = np.einsum("ipiq->pq", e2int[:nfrozen, nfrozen:, :nfrozen, nfrozen:])
+        J = np.einsum("ipqi->pq", e2int[:nfrozen, nfrozen:, nfrozen:, :nfrozen])
+        e1int[nfrozen:, nfrozen:] += 2*K - J
+
     return system, e1int[nfrozen:, nfrozen:], e2int[nfrozen:, nfrozen:, nfrozen:, nfrozen:]
 
 def get_reference_energy(gamess_logfile):
