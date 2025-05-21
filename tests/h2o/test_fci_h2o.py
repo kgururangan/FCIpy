@@ -15,9 +15,21 @@ def test_fci_h2o():
     #
     # create an FCI solver based on the SCF object
     #
-    cisolver = fci.FCI(mf)
+    mc = fci.FCI(mf)
+    expected_energy = mc.kernel(frozen=0)[0]
+    (dm1a, dm1b), (dm2aa, dm2ab, dm2bb), (dm3aaa, dm3aab, dm3abb, dm3bbb) = fci.direct_spin1.make_rdm123s(mc.ci, mol.nao, (5, 5), reorder=True)
+    # [WARNING]: 2-RDMs and 3-RDMs from PySCF must be transposed from Chemist to Physics notation
+    dm2aa = dm2aa.transpose(0, 2, 1, 3)
+    dm2ab = dm2ab.transpose(0, 2, 1, 3)
+    dm2bb = dm2bb.transpose(0, 2, 1, 3)
+    dm3aaa = dm3aaa.transpose(0, 2, 4, 1, 3, 5)
+    dm3aab = dm3aab.transpose(0, 2, 4, 1, 3, 5)
+    dm3abb = dm3abb.transpose(0, 2, 4, 1, 3, 5)
+    dm3bbb = dm3bbb.transpose(0, 2, 4, 1, 3, 5)
 
-    driver = Driver.from_pyscf(mf, nfrozen=1)
+    expected_rdms = {'a': dm1a, 'b': dm1b, 'aa': dm2aa, 'ab': dm2ab, 'bb': dm2bb, 'aaa': dm3aaa, 'aab': dm3aab, 'abb': dm3abb, 'bbb': dm3bbb}
+
+    driver = Driver.from_pyscf(mf, nfrozen=0)
     driver.system.print_info()
 
     # read the determinants
@@ -25,18 +37,22 @@ def test_fci_h2o():
 
     # run CI calculation
     driver.run_ci(nroot=1, prtol=0.01)
-    #driver.diagonalize_hamiltonian()
-    print(driver.total_energy[0])
 
     # compute the 1-RDM
-    #driver.one_e_density_matrix()
+    driver.build_rdm1s()
+    # compute the 2-RDM
+    driver.build_rdm2s()
 
     #print("Natural occupation numbers:")
     #for i, n in enumerate(driver.nat_occ_num[0]):
     #    print(f"Orbital {i + 1}: {n}")
 
     # check the results
-    assert np.allclose(driver.total_energy[0], cisolver.kernel(frozen=1)[0])
+    assert np.allclose(driver.total_energy[0], expected_energy)
+    for key, value in driver.rdms[0].items():
+        print(f"error in rdm({key}): {np.linalg.norm(value.flatten() - expected_rdms[key].flatten())}")
+
+
 
 if __name__ == "__main__":
     test_fci_h2o()

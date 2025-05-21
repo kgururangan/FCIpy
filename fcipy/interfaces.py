@@ -53,7 +53,6 @@ def load_pyscf_integrals(meanfield, nfrozen=0, ndelete=0):
     # Check that the HF energy calculated using the integrals matches the PySCF result
     hf_energy = calc_hf_energy(e1int, e2int, system)
     hf_frozen = calc_hf_frozen_energy(e1int, e2int, system)
-    #frozen_energy = hf_energy - hf_unfrozen
     hf_energy += nuclear_repulsion
 
     if not np.allclose(hf_energy, meanfield.energy_tot(), atol=1.0e-06, rtol=0.0):
@@ -66,7 +65,9 @@ def load_pyscf_integrals(meanfield, nfrozen=0, ndelete=0):
         J = np.einsum("ipqi->pq", e2int[:nfrozen, nfrozen:, nfrozen:, :nfrozen])
         e1int[nfrozen:, nfrozen:] += 2*K - J
 
-    return system, e1int[nfrozen:, nfrozen:], e2int[nfrozen:, nfrozen:, nfrozen:, nfrozen:]
+    start = nfrozen
+    end = e1int.shape[0] - ndelete
+    return system, e1int[start:end, start:end], e2int[start:end, start:end, start:end, start:end]
 
 def load_gamess_integrals(
     logfile=None,

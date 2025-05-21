@@ -913,6 +913,7 @@ module ci
 
         end
 
+
         integer function n_excitations(det1,det2,Nint)
           !   Slater-Condon Rules
           !   Copyright (C) 2013 Anthony Scemama <scemama@irsamc.ups-tlse.fr>
@@ -949,7 +950,7 @@ module ci
 
         end
 
-        subroutine compute_density_matrix(det,Ndet,coef,mo_num, &
+        subroutine compute_rdm1(det,Ndet,coef,mo_num, &
                        Nint,density_matrix)
         !   Slater-Condon Rules
         !   Copyright (C) 2013 Anthony Scemama <scemama@irsamc.ups-tlse.fr>
@@ -981,6 +982,7 @@ module ci
 
          density_matrix = 0.d0
          do k=1,Ndet
+          ! diagonal: <I|p+ q|I>
           do ispin=1,2
             ishift = 0
             do i=1,Nint
@@ -994,8 +996,9 @@ module ci
               ishift = ishift+64
             end do
           end do
+          ! off-diagonal: <J|p+ q|I>
           do l=1,k-1
-           if (n_excitations(det(1,1,k),det(1,1,l),Nint) /= 1) then
+           if (exc_degree(det(1,1,k),det(1,1,l),Nint) /= 1) then
              cycle
            end if
            call get_excitation(det(1,1,k),det(1,1,l),exc,deg,phase,Nint)
@@ -1012,6 +1015,183 @@ module ci
           end do
          end do
         end
+
+        subroutine compute_rdm1s(det,Ndet,coef,mo_num,noa,nob,&
+                                 Nint,rdm1a,rdm1b)
+         integer*8, intent(in)         :: det(Nint,2,Ndet)
+         integer, intent(in)           :: Ndet, Nint, mo_num, noa, nob
+         double precision, intent(in)  :: coef(Ndet)
+         double precision, intent(out) :: rdm1a(mo_num,mo_num)
+         double precision, intent(out) :: rdm1b(mo_num,mo_num)
+
+         integer :: i,j,k,l,ispin,ishift
+         integer*8 :: buffer, det_I(Nint,2), det_J(Nint,2)
+         integer :: deg
+         integer :: exc(0:2,2,2) ! [(0:n,1,2:mo_idx), hole/part, ispin]
+         double precision :: phase, c
+         integer :: occ(noa,2)
+
+         rdm1a = 0.d0
+         rdm1b = 0.d0
+         do k=1,Ndet
+          det_I = det(:,:,k)
+          c = coef(k)*coef(k)
+          call get_occupied(det_I,Nint,noa,occ)
+          !
+          ! diagonal: <I|p+ q|I>
+          !
+          ! alpha --->
+          do j=1,noa
+             rdm1a(occ(j,1),occ(j,1)) = rdm1a(occ(j,1),occ(j,1)) + c
+          end do
+          ! beta ---> 
+          do j=1,nob
+             rdm1b(occ(j,2),occ(j,2)) = rdm1b(occ(j,2),occ(j,2)) + c
+          end do
+          !
+          ! off-diagonal: <J|p+ q|I>
+          !
+          do l=1,k-1
+           det_J = det(:,:,l)
+           call get_excitation(det_I,det_J,exc,deg,phase,Nint)
+           if (deg /= 1) cycle
+           c = phase*coef(k)*coef(l)
+           if (exc(0,1,1) == 1) then ! a -> a
+             i = exc(1,1,1)
+             j = exc(1,2,1)
+             rdm1a(j,i) = rdm1a(j,i) + c
+             rdm1a(i,j) = rdm1a(i,j) + c
+           else ! b -> b
+             i = exc(1,1,2)
+             j = exc(1,2,2)
+             rdm1b(j,i) = rdm1b(j,i) + c
+             rdm1b(i,j) = rdm1b(i,j) + c
+           end if
+          end do
+         end do
+        end
+
+        subroutine compute_rdm2s(det,Ndet,coef,mo_num,noa,nob,&
+                                 Nint,rdm2a,rdm2b,rdm2c)
+         integer*8, intent(in)         :: det(Nint,2,Ndet)
+         integer, intent(in)           :: Ndet, Nint, mo_num, noa, nob
+         double precision, intent(in)  :: coef(Ndet)
+         double precision, intent(out) :: rdm2a(mo_num,mo_num,mo_num,mo_num)
+         double precision, intent(out) :: rdm2b(mo_num,mo_num,mo_num,mo_num)
+         double precision, intent(out) :: rdm2c(mo_num,mo_num,mo_num,mo_num)
+
+         integer :: i,j,k,l,m,n,ispin,ishift,ii,jj,kk,ll,mm,nn
+         integer :: degree
+         integer :: exc(0:2,2,2) ! [(0:n,1,2:mo_idx), hole/part, ispin]
+         double precision :: phase, c, cp
+         integer :: occ(noa,2)
+
+         rdm2a = 0.d0
+         rdm2b = 0.d0
+         rdm2c = 0.d0
+         do n=1,Ndet
+            call get_occupied(det(:,:,n), Nint, noa, occ)
+            do m=1,Ndet
+               call get_excitation(det(:,:,n),det(:,:,m),exc,degree,phase,Nint)
+               if (degree >= 3) cycle
+               c = coef(n)*coef(m)
+               cp = phase*c
+               !
+               ! Case work
+               !
+               if (degree==0) then ! diagonal: < I | p+q+sr | I > = < I | p+q+qp | I >
+                  ! aa --->
+                  do ii=1,noa
+                     do jj=ii+1,noa
+                        i = occ(ii,1); j = occ(jj,1);
+                        rdm2a(i,j,i,j) = rdm2a(i,j,i,j) + c
+                        rdm2a(i,j,j,i) = rdm2a(i,j,j,i) - c
+                        rdm2a(j,i,i,j) = rdm2a(j,i,i,j) - c
+                        rdm2a(j,i,j,i) = rdm2a(j,i,j,i) + c
+                     end do
+                  end do
+                  ! ab ---> 
+                  do ii=1,noa
+                     do jj=1,nob
+                        i = occ(ii,1); j = occ(jj,2);
+                        rdm2b(i,j,i,j) = rdm2b(i,j,i,j) + c
+                     end do
+                  end do
+                  ! bb --->
+                  do ii=1,nob
+                     do jj=ii+1,nob
+                        i = occ(ii,2); j = occ(jj,2);
+                        rdm2c(i,j,i,j) = rdm2c(i,j,i,j) + c
+                        rdm2c(i,j,j,i) = rdm2c(i,j,j,i) - c
+                        rdm2c(j,i,i,j) = rdm2c(j,i,i,j) - c
+                        rdm2c(j,i,j,i) = rdm2c(j,i,j,i) + c
+                     end do
+                  end do
+               else if (degree==1) then ! single excitation
+                  if (exc(0,1,1)==1) then ! single excitation is a->a
+                     i=exc(1,1,1)
+                     j=exc(1,2,1)
+                     ! aa --->
+                     do kk=1,noa
+                        k = occ(kk,1)
+                        rdm2a(i,k,j,k) = rdm2a(i,k,j,k) + cp
+                        rdm2a(k,i,j,k) = rdm2a(k,i,j,k) - cp
+                        rdm2a(i,k,k,j) = rdm2a(i,k,k,j) - cp
+                        rdm2a(k,i,k,j) = rdm2a(k,i,k,j) + cp
+                     end do
+                     ! ab ---> 
+                     do kk=1,nob
+                        k = occ(kk,2)
+                        rdm2b(i,k,j,k) = rdm2b(i,k,j,k) + cp
+                     end do
+                  else ! single excitation is b->b
+                     i=exc(1,1,2)
+                     j=exc(1,2,2)
+                     ! ab ---> 
+                     do kk=1,noa
+                        k = occ(kk,1)
+                        rdm2b(k,i,k,j) = rdm2b(k,i,k,j) + cp
+                     end do
+                     ! bb --->
+                     do kk=1,nob
+                        k = occ(kk,2)
+                        rdm2c(i,k,j,k) = rdm2c(i,k,j,k) + cp
+                        rdm2c(k,i,j,k) = rdm2c(k,i,j,k) - cp
+                        rdm2c(i,k,k,j) = rdm2c(i,k,k,j) - cp
+                        rdm2c(k,i,k,j) = rdm2c(k,i,k,j) + cp
+                     end do
+                  end if
+               else if (degree==2) then
+                  if (exc(0,1,1)==2) then ! double excitation is aa->aa
+                     i=exc(1,1,1)
+                     j=exc(1,2,1)
+                     k=exc(2,1,1)
+                     l=exc(2,2,1)
+                     rdm2a(i,k,j,l) = rdm2a(i,k,j,l) + cp
+                     rdm2a(k,i,j,l) = rdm2a(k,i,j,l) - cp
+                     rdm2a(i,k,l,j) = rdm2a(i,k,l,j) - cp
+                     rdm2a(k,i,l,j) = rdm2a(k,i,l,j) + cp
+                  else if (exc(0,1,2)==2) then ! double excitation is bb->bb
+                     i=exc(1,1,2)
+                     j=exc(1,2,2)
+                     k=exc(2,1,2)
+                     l=exc(2,2,2)
+                     rdm2c(i,k,j,l) = rdm2c(i,k,j,l) + cp
+                     rdm2c(k,i,j,l) = rdm2c(k,i,j,l) - cp
+                     rdm2c(i,k,l,j) = rdm2c(i,k,l,j) - cp
+                     rdm2c(k,i,l,j) = rdm2c(k,i,l,j) + cp
+                  else ! double excitation is ab->ab
+                     i=exc(1,1,1)
+                     j=exc(1,2,1)
+                     k=exc(1,1,2)
+                     l=exc(1,2,2)
+                     rdm2b(i,k,j,l) = rdm2b(i,k,j,l) + cp
+                  end if
+               end if
+            end do
+         end do
+        end
+
         
         subroutine sort_determinants(sigma,coef,det,N_int,ndet,A,nloc,ispin,e_diag)
 

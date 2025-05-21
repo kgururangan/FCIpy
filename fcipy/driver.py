@@ -30,6 +30,7 @@ class Driver:
         self.num_alpha = 0
         self.num_beta = 0
         self.rdm1 = [None for _ in range(100)]
+        self.rdms = [{} for _ in range(100)]
         self.nat_orb = [None for _ in range(100)]
         self.nat_occ_num = [None for _ in range(100)]
 
@@ -92,4 +93,20 @@ class Driver:
         for i in range(self.coef.shape[1]):
             self.rdm1[i] = compute_rdm1(self.det, self.coef[:, i], self.system.norbitals)
             self.nat_occ_num[i], self.nat_orb[i] = np.linalg.eigh(self.rdm1[i])
+
+    def build_rdm1s(self):
+        from fcipy.density import compute_rdm1s
+        for i in range(self.coef.shape[1]):
+            dm1a, dm1b = compute_rdm1s(self.det, self.coef[:, i], self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
+            self.rdms[i]['a'] = dm1a
+            self.rdms[i]['b'] = dm1b
+
+    def build_rdm2s(self):
+        from fcipy.density import compute_rdm2s
+        for i in range(self.coef.shape[1]):
+            dm2aa, dm2ab, dm2bb = compute_rdm2s(self.det, self.coef[:, i], self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
+            self.rdms[i]['aa'] = dm2aa
+            self.rdms[i]['ab'] = dm2ab
+            self.rdms[i]['bb'] = dm2bb
+
 
