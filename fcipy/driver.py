@@ -88,12 +88,6 @@ class Driver:
         self.total_energy += self.system.frozen_energy
         self.total_energy += self.system.nuclear_repulsion
 
-    def one_e_density_matrix(self):
-        from fcipy.density import compute_rdm1
-        for i in range(self.coef.shape[1]):
-            self.rdm1[i] = compute_rdm1(self.det, self.coef[:, i], self.system.norbitals)
-            self.nat_occ_num[i], self.nat_orb[i] = np.linalg.eigh(self.rdm1[i])
-
     def build_rdm1s(self):
         from fcipy.density import compute_rdm1s
         for i in range(self.coef.shape[1]):
@@ -108,5 +102,14 @@ class Driver:
             self.rdms[i]['aa'] = dm2aa
             self.rdms[i]['ab'] = dm2ab
             self.rdms[i]['bb'] = dm2bb
+
+    def build_rdm3s(self):
+        from fcipy.density import compute_rdm3s
+        for i in range(self.coef.shape[1]):
+            dm3aaa, dm3aab, dm3abb, dm3bbb = compute_rdm3s(self.det, self.coef[:, i], self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
+            self.rdms[i]['aaa'] = dm3aaa
+            self.rdms[i]['aab'] = dm3aab
+            self.rdms[i]['abb'] = dm3abb
+            self.rdms[i]['bbb'] = dm3bbb
 
 

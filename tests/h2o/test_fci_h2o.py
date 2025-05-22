@@ -8,7 +8,7 @@ def test_fci_h2o():
             ["H", (0, -1.515263, -1.058898)],
             ["O", (0.0, 0.0, -0.0090)]]
 
-    mol = gto.M(atom=geom, basis="sto-3g", spin=0, charge=0, unit="Bohr", symmetry="C2V")
+    mol = gto.M(atom=geom, basis="6-31g", spin=0, charge=0, unit="Bohr", symmetry="C2V")
     mf = scf.RHF(mol)
     mf.kernel()
 
@@ -16,7 +16,7 @@ def test_fci_h2o():
     # create an FCI solver based on the SCF object
     #
     mc = fci.FCI(mf)
-    expected_energy = mc.kernel(frozen=0)[0]
+    expected_energy = mc.kernel()[0]
     (dm1a, dm1b), (dm2aa, dm2ab, dm2bb), (dm3aaa, dm3aab, dm3abb, dm3bbb) = fci.direct_spin1.make_rdm123s(mc.ci, mol.nao, (5, 5), reorder=True)
     # [WARNING]: 2-RDMs and 3-RDMs from PySCF must be transposed from Chemist to Physics notation
     dm2aa = dm2aa.transpose(0, 2, 1, 3)
@@ -42,6 +42,8 @@ def test_fci_h2o():
     driver.build_rdm1s()
     # compute the 2-RDM
     driver.build_rdm2s()
+    # compute the 3-RDM
+    driver.build_rdm3s()
 
     #print("Natural occupation numbers:")
     #for i, n in enumerate(driver.nat_occ_num[0]):
@@ -51,6 +53,18 @@ def test_fci_h2o():
     assert np.allclose(driver.total_energy[0], expected_energy)
     for key, value in driver.rdms[0].items():
         print(f"error in rdm({key}): {np.linalg.norm(value.flatten() - expected_rdms[key].flatten())}")
+
+    M = driver.system.norbitals
+    dm = driver.rdms[0]['aab']
+    dme = dm3aab
+    for p in range(M):
+        for q in range(p, M):
+            for r in range(M):
+                for s in range(M):
+                    for t in range(s, M):
+                        for u in range(M):
+                            if abs(dm[p,q,r,s,t,u] - dme[p,q,r,s,t,u]) > 1.0e-06:
+                                print(f"{p} {q} {r} {s} {t} {u}: {dm[p,q,r,s,t,u]}  {dme[p,q,r,s,t,u]}")
 
 
 
