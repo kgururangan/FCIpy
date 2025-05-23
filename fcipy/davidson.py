@@ -3,7 +3,7 @@ import numpy as np
 from fcipy.lib import ci
 from fcipy.printing import print_dav_iteration_header, print_dav_iteration, dav_calculation_summary, get_timestamp
 
-def davidson(system, det, e1int, e2int, b, e, e_diag, tolerance, max_size, maxit):
+def davidson(system, det, e1int, e2int, b, e, e_diag, tolerance, max_size, maxit, herm):
 
     print_dav_iteration_header()
 
@@ -16,7 +16,10 @@ def davidson(system, det, e1int, e2int, b, e, e_diag, tolerance, max_size, maxit
     G = np.zeros((max_size, max_size))
 
     B[:, 0] = b
-    S[:, 0] = ci.ci.calc_sigma(det, e1int, e2int, noa, nob, b)
+    if herm:
+        S[:, 0] = ci.ci.calc_sigma(det, e1int, e2int, noa, nob, b)
+    else:
+        S[:, 0] = ci.ci.calc_sigma_nonhermitian(det, e1int, e2int, noa, nob, b)
 
     is_converged = False
     curr_size = 1
@@ -57,10 +60,16 @@ def davidson(system, det, e1int, e2int, b, e, e_diag, tolerance, max_size, maxit
         # enlarge the subsapce
         if curr_size < max_size:
             B[:, curr_size] = r
-            S[:, curr_size] = ci.ci.calc_sigma(det, e1int, e2int, noa, nob, r) 
+            if herm:
+                S[:, curr_size] = ci.ci.calc_sigma(det, e1int, e2int, noa, nob, r)
+            else:
+                S[:, curr_size] = ci.ci.calc_sigma_nonhermitian(det, e1int, e2int, noa, nob, r)
         else: # if max_size exceeded, restart from current guess to eigenvector
             B[:, 0] = v
-            S[:, 0] = ci.ci.calc_sigma(det, e1int, e2int, noa, nob, v) 
+            if herm:
+                S[:, 0] = ci.ci.calc_sigma(det, e1int, e2int, noa, nob, v)
+            else:
+                S[:, curr_size] = ci.ci.calc_sigma_nonhermitian(det, e1int, e2int, noa, nob, r)
             curr_size = 0
         # update iteration counter
         elapsed_time = time.time() - t1
@@ -69,7 +78,7 @@ def davidson(system, det, e1int, e2int, b, e, e_diag, tolerance, max_size, maxit
 
     return e + system.nuclear_repulsion + system.frozen_energy, v, is_converged
 
-def davidson_opt(system, det, num_alpha, num_beta, e1int, e2int, b, e, e_diag, tolerance, max_size, maxit):
+def davidson_opt(system, det, num_alpha, num_beta, e1int, e2int, b, e, e_diag, tolerance, max_size, maxit, herm):
 
     print_dav_iteration_header()
 
@@ -82,7 +91,10 @@ def davidson_opt(system, det, num_alpha, num_beta, e1int, e2int, b, e, e_diag, t
     G = np.zeros((max_size, max_size))
 
     B[:, 0] = b
-    det, B[:, 0], S[:, 0], e_diag = ci.ci.calc_sigma_opt(det, num_alpha, num_beta, e1int, e2int, noa, nob, b, e_diag)
+    if herm:
+        det, B[:, 0], S[:, 0], e_diag = ci.ci.calc_sigma_opt(det, num_alpha, num_beta, e1int, e2int, noa, nob, b, e_diag)
+    else:
+        det, B[:, 0], S[:, 0], e_diag = ci.ci.calc_sigma_nonhermitian_opt(det, num_alpha, num_beta, e1int, e2int, noa, nob, b, e_diag)
 
     is_converged = False
     curr_size = 1
@@ -122,10 +134,16 @@ def davidson_opt(system, det, num_alpha, num_beta, e1int, e2int, b, e, e_diag, t
         # enlarge the subsapce
         if curr_size < max_size:
             B[:, curr_size] = r
-            det, B[:, curr_size], S[:, curr_size], e_diag = ci.ci.calc_sigma_opt(det, num_alpha, num_beta, e1int, e2int, noa, nob, r, e_diag)
+            if herm:
+                det, B[:, curr_size], S[:, curr_size], e_diag = ci.ci.calc_sigma_opt(det, num_alpha, num_beta, e1int, e2int, noa, nob, r, e_diag)
+            else:
+                det, B[:, curr_size], S[:, curr_size], e_diag = ci.ci.calc_sigma_nonhermitian_opt(det, num_alpha, num_beta, e1int, e2int, noa, nob, r, e_diag)
         else: # if max_size exceeded, restart from current guess to eigenvector
             B[:, 0] = v
-            det, B[:, 0], S[:, 0], e_diag = ci.ci.calc_sigma_opt(det, num_alpha, num_beta, e1int, e2int, noa, nob, v, e_diag)
+            if herm:
+                det, B[:, 0], S[:, 0], e_diag = ci.ci.calc_sigma_opt(det, num_alpha, num_beta, e1int, e2int, noa, nob, v, e_diag)
+            else:
+                det, B[:, 0], S[:, 0], e_diag = ci.ci.calc_sigma_nonhermitian_opt(det, num_alpha, num_beta, e1int, e2int, noa, nob, v, e_diag)
             curr_size = 0
         # update iteration counter
         elapsed_time = time.time() - t1

@@ -17,8 +17,9 @@ class Driver:
                     *load_gamess_integrals(logfile, fcidump, onebody, twobody, nfrozen, ndelete, multiplicity)
                    )
 
-    def __init__(self, system, e1int, e2int):
+    def __init__(self, system, e1int, e2int, herm=True):
         self.system = system
+        self.herm = herm
         self.e1int = e1int
         self.e2int = e2int
         self.coef = None
@@ -66,10 +67,10 @@ class Driver:
             # for now, the sorting routine in the optimized CI requires that N_int = 1
             assert self.N_int == 1
             self.det, self.total_energy, self.coef = run_davidson_opt(self.system, self.det, self.num_alpha, self.num_beta, self.e1int, self.e2int, nroot,
-                                                                      convergence=convergence, max_size=max_size, maxit=maxit, print_thresh=prtol)
+                                                                      convergence=convergence, max_size=max_size, maxit=maxit, print_thresh=prtol, herm=self.herm)
         else:
             self.total_energy, self.coef = run_davidson(self.system, self.det, self.e1int, self.e2int, nroot,
-                                                        convergence=convergence, max_size=max_size, maxit=maxit, print_thresh=prtol)
+                                                        convergence=convergence, max_size=max_size, maxit=maxit, print_thresh=prtol, herm=self.herm)
 
     def build_hamiltonian(self, opt=True):
         from fcipy.hamiltonian import build_hamiltonian
@@ -79,12 +80,21 @@ class Driver:
         #     print(self.det.shape)
         #     self.det, self.Hmat = build_hamiltonian_opt(self.det, self.num_alpha, self.num_beta, self.e1int, self.e2int, self.system.noccupied_alpha, self.system.noccupied_beta, self.system.reference_energy)
         # else:
-        self.Hmat = build_hamiltonian(self.det, self.e1int, self.e2int, self.system.noccupied_alpha, self.system.noccupied_beta)
+        self.Hmat = build_hamiltonian(self.det, self.e1int, self.e2int, self.system.noccupied_alpha, self.system.noccupied_beta, herm=self.herm)
 
     def diagonalize_hamiltonian(self, opt=True):
+
         if self.Hmat is None:
             self.build_hamiltonian(opt=opt)
-        self.total_energy, self.coef = np.linalg.eigh(self.Hmat)
+
+        if self.herm:
+            self.total_energy, self.coef = np.linalg.eigh(self.Hmat)
+        else:
+            self.total_energy, self.coef = np.linalg.eig(self.Hmat)
+            idx = np.argsort(self.total_energy)
+            self.total_energy = self.total_energy[idx]
+            self.coef = self.coef[:, idx]
+
         self.total_energy += self.system.frozen_energy
         self.total_energy += self.system.nuclear_repulsion
 
