@@ -29,6 +29,7 @@ class Driver:
         self.e2int = e2int
         self.coef = None
         self.total_energy = None
+        self.state_eigval = None
         self.det = None
         self.ndet = 0
         self.Hmat = None
@@ -71,10 +72,10 @@ class Driver:
         if opt:
             # for now, the sorting routine in the optimized CI requires that N_int = 1
             assert self.N_int == 1
-            self.det, self.total_energy, self.coef = run_davidson_opt(self.system, self.det, self.num_alpha, self.num_beta, self.e1int, self.e2int, self.coef, self.total_energy,
-                                                                      nroot, convergence=convergence, max_size=max_size, maxit=maxit, herm=herm, print_thresh=prtol)
+            self.total_energy, self.state_eigval, self.coef = run_davidson_opt(self.system, self.det, self.num_alpha, self.num_beta, self.e1int, self.e2int, self.coef,
+                                                            nroot, convergence=convergence, max_size=max_size, maxit=maxit, herm=herm, print_thresh=prtol)
         else:
-            self.total_energy, self.coef = run_davidson(self.system, self.det, self.e1int, self.e2int, self.coef, self.total_energy, nroot,
+            self.total_energy, self.state_eigval, self.coef = run_davidson(self.system, self.det, self.e1int, self.e2int, self.coef, nroot,
                                                         convergence=convergence, max_size=max_size, maxit=maxit, herm=herm, print_thresh=prtol)
 
     def build_hamiltonian(self, herm=True):
@@ -87,38 +88,67 @@ class Driver:
             self.build_hamiltonian()
 
         if herm:
-            self.total_energy, self.coef = np.linalg.eigh(self.Hmat)
+            self.state_eigval, self.coef = np.linalg.eigh(self.Hmat)
         else:
-            self.total_energy, self.coef = np.linalg.eig(self.Hmat)
+            self.state_eigval, self.coef = np.linalg.eig(self.Hmat)
             idx = np.argsort(self.total_energy)
-            self.total_energy = self.total_energy[idx]
+            self.state_eigval = self.state_eigval[idx]
             self.coef = self.coef[:, idx]
 
-        self.total_energy += self.system.frozen_energy
-        self.total_energy += self.system.nuclear_repulsion
+        self.total_energy = self.state_eigval + self.system.frozen_energy + self.system.nuclear_repulsion
 
-    def build_rdm1s(self):
+    def compute_energy(self, herm):
+        from fcipy.ci_energy import energy_ci_state
+
+        energy = np.zeros(self.coef.shape[1])
+        for istate in range(self.coef.shape[1]):
+            energy[istate] = energy_ci_state(self.det, self.coef[:, istate], self.e1int, self.e2int,
+                                             self.system.noccupied_alpha, self.system.noccupied_beta,
+                                             self.num_alpha, self.num_beta, herm)
+        # Add frozen energy and nuclear repulsion to eigenvalues to make total energy
+        total_energy = energy + self.system.frozen_energy + self.system.nuclear_repulsion
+        return energy, total_energy
+
+    def apply_hamiltonian(self, c, herm):
+        from fcipy.lib import ci
+
+        e_diag = ci.ci.calc_diagonal(self.det, self.system.noccupied_alpha, self.system.noccupied_beta, self.e1int, self.e2int)
+        if herm:
+            sigma = ci.ci.calc_sigma_opt(self.det, e_diag, c, self.num_alpha, self.num_beta, self.e1int, self.e2int, self.system.noccupied_alpha, self.system.noccupied_beta)
+        else:
+            sigma = ci.ci.calc_sigma_nonhermitian_opt(self.det, e_diag, c, self.num_alpha, self.num_beta, self.e1int, self.e2int, self.system.noccupied_alpha, self.system.noccupied_beta)
+
+        return sigma
+
+    def build_rdm1s(self, i=0):
         from fcipy.density import compute_rdm1s
-        for i in range(self.coef.shape[1]):
-            dm1a, dm1b = compute_rdm1s(self.det, self.coef[:, i], self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
-            self.rdms[i]['a'] = dm1a
-            self.rdms[i]['b'] = dm1b
 
-    def build_rdm2s(self):
+        dm1a, dm1b = compute_rdm1s(self.det, self.coef[:, i], self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
+        self.rdms[i]['a'] = dm1a
+        self.rdms[i]['b'] = dm1b
+
+    def build_rdm2s(self, i=0):
         from fcipy.density import compute_rdm2s
-        for i in range(self.coef.shape[1]):
-            dm2aa, dm2ab, dm2bb = compute_rdm2s(self.det, self.coef[:, i], self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
-            self.rdms[i]['aa'] = dm2aa
-            self.rdms[i]['ab'] = dm2ab
-            self.rdms[i]['bb'] = dm2bb
+        dm2aa, dm2ab, dm2bb = compute_rdm2s(self.det, self.coef[:, i], self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
+        self.rdms[i]['aa'] = dm2aa
+        self.rdms[i]['ab'] = dm2ab
+        self.rdms[i]['bb'] = dm2bb
 
-    def build_rdm3s(self):
+    def build_rdm3s(self, i):
         from fcipy.density import compute_rdm3s
-        for i in range(self.coef.shape[1]):
-            dm3aaa, dm3aab, dm3abb, dm3bbb = compute_rdm3s(self.det, self.coef[:, i], self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
-            self.rdms[i]['aaa'] = dm3aaa
-            self.rdms[i]['aab'] = dm3aab
-            self.rdms[i]['abb'] = dm3abb
-            self.rdms[i]['bbb'] = dm3bbb
+        dm3aaa, dm3aab, dm3abb, dm3bbb = compute_rdm3s(self.det, self.coef[:, i], self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
+        self.rdms[i]['aaa'] = dm3aaa
+        self.rdms[i]['aab'] = dm3aab
+        self.rdms[i]['abb'] = dm3abb
+        self.rdms[i]['bbb'] = dm3bbb
 
+    def compute_rdm123s(self, i):
+        from fcipy.density import compute_rdm1s, compute_rdm2s, compute_rdm3s
+        rdms_i = {}
+
+        rdms_i['a'], rdms_i['b'] = compute_rdm1s(self.det, self.coef[:, i], self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
+        rdms_i['aa'], rdms_i['ab'], rdms_i['bb'] = compute_rdm2s(self.det, self.coef[:, i], self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
+        rdms_i['aaa'], rdms_i['aab'], rdms_i['abb'], rdms_i['bbb'] = compute_rdm3s(self.det, self.coef[:, i], self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
+
+        return rdms_i
 

@@ -402,6 +402,134 @@ module ci
                 deallocate(loc_arr)
        end subroutine calc_sigma_opt
        
+       subroutine calc_ci_energy(det,coef,N_int,ndet,num_alpha,num_beta,&
+                                 e1int,e2int,mo_num,&
+                                 noa,nob)
+
+                integer, intent(in) :: N_int, ndet, mo_num, noa, nob, num_alpha, num_beta
+                double precision, intent(in) :: e1int(mo_num,mo_num)
+                double precision, intent(in) :: e2int(mo_num,mo_num,mo_num,mo_num)
+                integer*8, intent(in) :: det(N_int,2,ndet)
+                double precision, intent(in) :: coef(ndet)
+                !
+                integer :: a1, a2, b1, b2, a, b
+                integer :: idet, jdet
+                integer :: occ(noa,2)
+                double precision :: hmatel, phase
+                integer :: exc(0:2,2,2)
+                integer :: degree
+                integer, allocatable :: loc_arr(:)
+                !
+                integer*8 :: det_buf(N_int,2,ndet)
+                integer :: idx(ndet)
+                
+                
+                !
+                ! diagonal loop
+                !
+                do idet=1,ndet
+                   ! sigma(I) <- <I|H|I>*I
+                   sigma(idet) = e_diag(idet)*coef(idet)
+                end do
+                !
+                ! alpha-alpha loop
+                !
+                ! sort determinants into blocks according to beta string
+                allocate(loc_arr(num_beta+1))
+                ! Copy over values in buffer arrays
+                det_buf(:,:,:) = det(:,:,:)
+                call sort_determinants(det_buf,idx,N_int,ndet,loc_arr,num_beta,2)
+                !
+                do a=1,num_beta
+                   do b1=loc_arr(a),loc_arr(a+1)-1
+                      call get_occupied(det_buf(:,:,b1), N_int, noa, occ)
+                      do b2=b1+1,loc_arr(a+1)-1
+                         if (exc_degree(det_buf(:,1,b1),det_buf(:,1,b2),N_int) <= 2) then
+                            ! b1 connected to b2 by a or aa excitation
+                            call get_excitation(det_buf(:,:,b1),det_buf(:,:,b2),exc,degree,phase,N_int)
+                            if (degree==1) then
+                               call slater1(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
+                               ! sigma(b1) <- <b1|H|b2>*c_b2
+                               sigma(idx(b1)) = sigma(idx(b1))+hmatel*coef(idx(b2))
+                               ! sigma(b2) <- <b2|H|b1>*c_b1
+                               sigma(idx(b2)) = sigma(idx(b2))+hmatel*coef(idx(b1))
+                            else if (degree==2) then
+                               call slater2(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
+                               ! sigma(b1) <- <b1|H|b2>*c_b2
+                               sigma(idx(b1)) = sigma(idx(b1))+hmatel*coef(idx(b2))
+                               ! sigma(b2) <- <b2|H|b1>*c_b1
+                               sigma(idx(b2)) = sigma(idx(b2))+hmatel*coef(idx(b1))
+                            end if
+                         end if
+                      end do
+                   end do
+                end do
+                !print*, 'Checking beta spin buckets'
+                !print*, '---------------------------'
+                !call check_spin_buckets(N_int, ndet, num_beta, loc_arr, det)
+                deallocate(loc_arr)
+                !
+                ! beta-beta loop
+                !
+                ! sort determinants into blocks according to alpha string
+                allocate(loc_arr(num_alpha+1))
+                ! Copy over values in buffer arrays
+                det_buf(:,:,:) = det(:,:,:)
+                call sort_determinants(det_buf,idx,N_int,ndet,loc_arr,num_alpha,1)
+                !
+                do a=1,num_alpha
+                   do b1=loc_arr(a),loc_arr(a+1)-1
+                      call get_occupied(det_buf(:,:,b1), N_int, noa, occ)
+                      do b2=b1+1,loc_arr(a+1)-1
+                         if (exc_degree(det_buf(:,2,b1),det_buf(:,2,b2),N_int) <= 2) then
+                            ! b1 connected to b2 by b or bb excitation
+                            call get_excitation(det_buf(:,:,b1),det_buf(:,:,b2),exc,degree,phase,N_int)
+                            if (degree==1) then
+                               call slater1(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
+                               ! sigma(b1) <- <b1|H|b2>*c_b2
+                               sigma(idx(b1)) = sigma(idx(b1))+hmatel*coef(idx(b2))
+                               ! sigma(b2) <- <b2|H|b1>*c_b1
+                               sigma(idx(b2)) = sigma(idx(b2))+hmatel*coef(idx(b1))
+                            else if (degree==2) then
+                               call slater2(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
+                               ! sigma(b1) <- <b1|H|b2>*c_b2
+                               sigma(idx(b1)) = sigma(idx(b1))+hmatel*coef(idx(b2))
+                               ! sigma(b2) <- <b2|H|b1>*c_b1
+                               sigma(idx(b2)) = sigma(idx(b2))+hmatel*coef(idx(b1))
+                            end if
+                         end if
+                      end do
+                   end do
+                end do
+                !print*, 'Checking alpha spin buckets'
+                !print*, '---------------------------'
+                !call check_spin_buckets(N_int, ndet, num_alpha, loc_arr, det)
+                !
+                ! alpha-beta loop
+                !
+                do a1=1,num_alpha
+                   do a2=a1+1,num_alpha
+                      ! get alpha excitation level between buckets
+                      if (exc_degree(det_buf(:,1,loc_arr(a1)),det_buf(:,1,loc_arr(a2)),N_int) /= 1) cycle
+                      do b1=loc_arr(a1),loc_arr(a1+1)-1
+                         call get_occupied(det_buf(:,:,b1), N_int, noa, occ)
+                         do b2=loc_arr(a2),loc_arr(a2+1)-1
+                            if (exc_degree(det_buf(:,2,b1),det_buf(:,2,b2),N_int) == 1) then
+                               ! b1 connected to b2 by ab excitations
+                               call get_excitation(det_buf(:,:,b1),det_buf(:,:,b2),exc,degree,phase,N_int)
+                               call slater2(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
+                               ! sigma(b1) <- <b1|H|b2>*c_b2
+                               sigma(idx(b1)) = sigma(idx(b1))+hmatel*coef(idx(b2))
+                               ! sigma(b2) <- <b2|H|b1>*c_b1
+                               sigma(idx(b2)) = sigma(idx(b2))+hmatel*coef(idx(b1))
+                            end if
+                         end do
+                      end do
+                   end do
+                end do
+                deallocate(loc_arr)
+       end subroutine calc_ci_energy
+       
        subroutine calc_sigma_nonhermitian_opt(sigma,det,e_diag,coef,N_int,ndet,num_alpha,num_beta,&
                                               e1int,e2int,mo_num,&
                                               noa,nob)

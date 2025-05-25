@@ -22,5 +22,10 @@ def test_ci_h2o():
         # check the results
         assert np.allclose(driver.total_energy[0], e_expected)
 
+    _, state_energy_compute = driver.compute_energy(herm=False)
+    
+    for e1, e2 in zip(state_energy_compute, driver.total_energy):
+        assert np.allclose(e1, e2, rtol=1.0e-08, atol=1.0e-08)
+
 if __name__ == "__main__":
     test_ci_h2o()
