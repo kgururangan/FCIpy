@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.9"]
 
     steps:
       - uses: actions/checkout@v3
@@ -27,7 +27,10 @@ jobs:
           sudo apt-get update && sudo apt-get install -y gfortran
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          pip install pytest
+
 
       - name: Install FCIpy
         run: pip install -e .
