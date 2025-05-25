@@ -77,20 +77,14 @@ class Driver:
             self.total_energy, self.coef = run_davidson(self.system, self.det, self.e1int, self.e2int, self.coef, self.total_energy, nroot,
                                                         convergence=convergence, max_size=max_size, maxit=maxit, herm=herm, print_thresh=prtol)
 
-    def build_hamiltonian(self, opt=True, herm=True):
+    def build_hamiltonian(self, herm=True):
         from fcipy.hamiltonian import build_hamiltonian
-        # if opt:
-        #     # for now, the sorting routine in the optimized CI requires that N_int = 1
-        #     assert self.N_int == 1
-        #     print(self.det.shape)
-        #     self.det, self.Hmat = build_hamiltonian_opt(self.det, self.num_alpha, self.num_beta, self.e1int, self.e2int, self.system.noccupied_alpha, self.system.noccupied_beta, self.system.reference_energy)
-        # else:
         self.Hmat = build_hamiltonian(self.det, self.e1int, self.e2int, self.system.noccupied_alpha, self.system.noccupied_beta, herm=herm)
 
     def diagonalize_hamiltonian(self, opt=True, herm=True):
 
         if self.Hmat is None:
-            self.build_hamiltonian(opt=opt)
+            self.build_hamiltonian()
 
         if herm:
             self.total_energy, self.coef = np.linalg.eigh(self.Hmat)

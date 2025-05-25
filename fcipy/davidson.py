@@ -92,9 +92,12 @@ def davidson_opt(system, det, num_alpha, num_beta, e1int, e2int, b, e, e_diag, t
 
     B[:, 0] = b
     if herm:
-        det, B[:, 0], S[:, 0], e_diag = ci.ci.calc_sigma_opt(det, num_alpha, num_beta, e1int, e2int, noa, nob, b, e_diag)
+        #det, B[:, 0], S[:, 0], e_diag = ci.ci.calc_sigma_opt(det, num_alpha, num_beta, e1int, e2int, noa, nob, b, e_diag)
+        S[:, 0] = ci.ci.calc_sigma_opt(det, e_diag, b, num_alpha, num_beta, e1int, e2int, noa, nob)
+
     else:
-        det, B[:, 0], S[:, 0], e_diag = ci.ci.calc_sigma_nonhermitian_opt(det, num_alpha, num_beta, e1int, e2int, noa, nob, b, e_diag)
+        # det, B[:, 0], S[:, 0], e_diag = ci.ci.calc_sigma_nonhermitian_opt(det, num_alpha, num_beta, e1int, e2int, noa, nob, b, e_diag)
+        S[:, 0] = ci.ci.calc_sigma_nonhermitian_opt(det, e_diag, b, num_alpha, num_beta, e1int, e2int, noa, nob)
 
     is_converged = False
     curr_size = 1
@@ -135,15 +138,19 @@ def davidson_opt(system, det, num_alpha, num_beta, e1int, e2int, b, e, e_diag, t
         if curr_size < max_size:
             B[:, curr_size] = r
             if herm:
-                det, B[:, curr_size], S[:, curr_size], e_diag = ci.ci.calc_sigma_opt(det, num_alpha, num_beta, e1int, e2int, noa, nob, r, e_diag)
+                # det, B[:, curr_size], S[:, curr_size], e_diag = ci.ci.calc_sigma_opt(det, num_alpha, num_beta, e1int, e2int, noa, nob, r, e_diag)
+                S[:, curr_size] = ci.ci.calc_sigma_opt(det, e_diag, r, num_alpha, num_beta, e1int, e2int, noa, nob)
             else:
-                det, B[:, curr_size], S[:, curr_size], e_diag = ci.ci.calc_sigma_nonhermitian_opt(det, num_alpha, num_beta, e1int, e2int, noa, nob, r, e_diag)
+                # det, B[:, curr_size], S[:, curr_size], e_diag = ci.ci.calc_sigma_nonhermitian_opt(det, num_alpha, num_beta, e1int, e2int, noa, nob, r, e_diag)
+                S[:, curr_size] = ci.ci.calc_sigma_nonhermitian_opt(det, e_diag, r, num_alpha, num_beta, e1int, e2int, noa, nob)
         else: # if max_size exceeded, restart from current guess to eigenvector
             B[:, 0] = v
             if herm:
-                det, B[:, 0], S[:, 0], e_diag = ci.ci.calc_sigma_opt(det, num_alpha, num_beta, e1int, e2int, noa, nob, v, e_diag)
+                # det, B[:, 0], S[:, 0], e_diag = ci.ci.calc_sigma_opt(det, num_alpha, num_beta, e1int, e2int, noa, nob, v, e_diag)
+                S[:, 0] = ci.ci.calc_sigma_opt(det, e_diag, v, num_alpha, num_beta, e1int, e2int, noa, nob)
             else:
-                det, B[:, 0], S[:, 0], e_diag = ci.ci.calc_sigma_nonhermitian_opt(det, num_alpha, num_beta, e1int, e2int, noa, nob, v, e_diag)
+                # det, B[:, 0], S[:, 0], e_diag = ci.ci.calc_sigma_nonhermitian_opt(det, num_alpha, num_beta, e1int, e2int, noa, nob, v, e_diag)
+                S[:, 0] = ci.ci.calc_sigma_nonhermitian_opt(det, e_diag, v, num_alpha, num_beta, e1int, e2int, noa, nob)
             curr_size = 0
         # update iteration counter
         elapsed_time = time.time() - t1
