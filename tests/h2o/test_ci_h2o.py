@@ -17,7 +17,7 @@ def test_ci_h2o():
         driver.load_determinants(file=f"psi_det_{ndet}")
 
         # run CI calculation
-        driver.run_ci(nroot=1)
+        driver.run_ci(nroot=1, opt=True, herm=False)
 
         # check the results
         assert np.allclose(driver.total_energy[0], e_expected)

@@ -69,7 +69,7 @@ def davidson(system, det, e1int, e2int, b, e, e_diag, tolerance, max_size, maxit
             if herm:
                 S[:, 0] = ci.ci.calc_sigma(det, e1int, e2int, noa, nob, v)
             else:
-                S[:, curr_size] = ci.ci.calc_sigma_nonhermitian(det, e1int, e2int, noa, nob, r)
+                S[:, 0] = ci.ci.calc_sigma_nonhermitian(det, e1int, e2int, noa, nob, v)
             curr_size = 0
         # update iteration counter
         elapsed_time = time.time() - t1
@@ -274,7 +274,7 @@ def davidson_opt(system, det, num_alpha, num_beta, e1int, e2int, b, e, e_diag, t
 #
 #     return R, omega, is_converged
 
-def run_davidson(system, det, e1int, e2int, nroot, convergence, max_size, maxit, print_thresh=0.09):
+def run_davidson(system, det, e1int, e2int, coef, energy, nroot, convergence, max_size, maxit, herm, print_thresh=0.09):
 
     ndim = det.shape[2]
     A_diag = ci.ci.calc_diagonal(det, system.noccupied_alpha, system.noccupied_beta, e1int, e2int)
@@ -285,32 +285,42 @@ def run_davidson(system, det, e1int, e2int, nroot, convergence, max_size, maxit,
 
     for n in range(nroot):
         e0 = A_diag[idx[n]]
-        b0 = np.zeros(ndim)
-        b0[idx[n]] = 1.0
+        if coef is None and energy is None:
+            b0 = np.zeros(ndim)
+            b0[idx[n]] = 1.0
+        else:
+            e0 = energy[n].copy()
+            b0 = coef[:, n] / np.linalg.norm(coef[:, n])
 
         print("   CI calculation for root %d started on" % n, get_timestamp())
         print("\n   Energy of initial guess = {:>10.10f}".format(e0 + system.nuclear_repulsion + system.frozen_energy))
-        e[n], v[:, n], is_converged = davidson(system, det, e1int, e2int, b0, e0, A_diag, convergence, max_size, maxit)
+        e[n], v[:, n], is_converged = davidson(system, det, e1int, e2int, b0, e0, A_diag, convergence, max_size, maxit, herm)
         dav_calculation_summary(e[n], det, v[:, n], is_converged, n, system, print_thresh)
     return e, v
 
-def run_davidson_opt(system, det, num_alpha, num_beta, e1int, e2int, nroot, convergence, max_size, maxit, print_thresh=0.09):
+def run_davidson_opt(system, det, num_alpha, num_beta, e1int, e2int, coef, energy, nroot, convergence, max_size, maxit, herm, print_thresh=0.09):
 
     ndim = det.shape[2]
     e = np.zeros(nroot)
     v = np.zeros((ndim, nroot))
 
     for n in range(nroot):
+
+        # Initial guess
         A_diag = ci.ci.calc_diagonal(det, system.noccupied_alpha, system.noccupied_beta, e1int, e2int)
-        idx = np.argsort(A_diag)
-        e0 = A_diag[idx[n]]
-        b0 = np.zeros(ndim)
-        b0[idx[n]] = 1.0
+        if coef is None and energy is None:
+            idx = np.argsort(A_diag)
+            e0 = A_diag[idx[n]]
+            b0 = np.zeros(ndim)
+            b0[idx[n]] = 1.0
+        else:
+            b0 = coef[:, n] / np.linalg.norm(coef[:, n])
+            e0 = energy[n].copy()
 
         print("   CI calculation for root %d started on" % n, get_timestamp())
         print(f"   Number of unique alpha strings: {num_alpha}")
         print(f"   Number of unique beta strings: {num_beta}")
         print("\n   Energy of initial guess = {:>10.10f}".format(e0 + system.nuclear_repulsion + system.frozen_energy))
-        det, e[n], v[:, n], is_converged = davidson_opt(system, det, num_alpha, num_beta, e1int, e2int, b0, e0, A_diag, convergence, max_size, maxit)
+        det, e[n], v[:, n], is_converged = davidson_opt(system, det, num_alpha, num_beta, e1int, e2int, b0, e0, A_diag, convergence, max_size, maxit, herm)
         dav_calculation_summary(e[n], det, v[:, n], is_converged, n, system, print_thresh)
     return det, e, v

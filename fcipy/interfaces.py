@@ -5,6 +5,42 @@ from fcipy.system import System
 eVtohartree = 0.036749308136649
 hartreetoeV = 1.0/(eVtohartree)
 
+def general_system(nelectrons, norbitals, nfrozen, ndelete, mult, e1int, e2int, nuclear_repulsion):
+    """Builds the System and Integral objects using minimal information from a general/custom system.
+
+    Arguments:
+    ----------
+    meanFieldObj : Object -> PySCF SCF/mean-field object
+    nfrozen : int -> number of frozen electrons
+    Returns:
+    ----------
+    system: System object
+    integrals: Integral object
+    """
+
+    system = System(
+        nelectrons,
+        norbitals,
+        mult,  # PySCF mol.spin returns 2S, not S
+        nfrozen,
+        ndelete=ndelete,
+        point_group="C1",
+        orbital_symmetries=['A' for _ in range(norbitals)],
+        charge=0,
+        nuclear_repulsion=nuclear_repulsion,
+    )
+
+    system.frozen_energy = calc_hf_frozen_energy(e1int, e2int, system)
+    if system.nfrozen > 0:
+        K = np.einsum("ipiq->pq", e2int[:nfrozen, nfrozen:, :nfrozen, nfrozen:])
+        J = np.einsum("ipqi->pq", e2int[:nfrozen, nfrozen:, nfrozen:, :nfrozen])
+        e1int[nfrozen:, nfrozen:] += 2*K - J
+
+    start = nfrozen
+    end = e1int.shape[0] - ndelete
+    return system, e1int[start:end, start:end], e2int[start:end, start:end, start:end, start:end]
+
+
 def load_pyscf_integrals(meanfield, nfrozen=0, ndelete=0):
     """Builds the System and Integral objects using the information contained within a PySCF
     mean-field object for a molecular system.
@@ -31,7 +67,7 @@ def load_pyscf_integrals(meanfield, nfrozen=0, ndelete=0):
         nfrozen,
         ndelete=ndelete,
         point_group=molecule.symmetry,
-        orbital_symmetries = [x.upper() for x in symm.label_orb_symm(molecule, molecule.irrep_name, molecule.symm_orb, mo_coeff)],
+        orbital_symmetries=[x.upper() for x in symm.label_orb_symm(molecule, molecule.irrep_name, molecule.symm_orb, mo_coeff)],
         charge=molecule.charge,
         nuclear_repulsion=nuclear_repulsion,
         mo_energies=meanfield.mo_energy,

@@ -316,22 +316,34 @@ module ci
                 do a=1,num_beta
                    do b1=loc_arr(a),loc_arr(a+1)-1
                       call get_occupied(det(:,:,b1), N_int, noa, occ)
-                      do b2=loc_arr(a),loc_arr(a+1)-1
-                         if (b1==b2) cycle ! skip diagonal case
-                         if (exc_degree(det(:,1,b1),det(:,1,b2),N_int) <= 2) then
+                      do b2=b1+1,loc_arr(a+1)-1
+                         degree = exc_degree(det(:,1,b1),det(:,1,b2),N_int)
+                         if (degree <= 2) then
+                            
                             ! b1 connected to b2 by a or aa excitation
                             call get_excitation(det(:,:,b1),det(:,:,b2),exc,degree,phase,N_int)
                             if (degree==1) then
                                call slater1(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
                                ! sigma(b1) <- <b1|H|b2>*c_b2
                                sigma(b1) = sigma(b1)+hmatel*coef(b2)
-                               ! sigma(b2) <- <b2|H|b1>*c_b1
-                               sigma(b2) = sigma(b2)+hmatel*coef(b1)
                             else if (degree==2) then
                                call slater2(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
                                ! sigma(b1) <- <b1|H|b2>*c_b2
                                sigma(b1) = sigma(b1)+hmatel*coef(b2)
                             end if
+
+                            ! b2 connected to b1 by a or aa excitation
+                            call get_excitation(det(:,:,b2),det(:,:,b1),exc,degree,phase,N_int)
+                            if (degree==1) then
+                               call slater1(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
+                               ! sigma(b2) <- <b2|H|b1>*c_b1
+                               sigma(b2) = sigma(b2)+hmatel*coef(b1)
+                            else if (degree==2) then
+                               call slater2(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
+                               ! sigma(b2) <- <b2|H|b1>*c_b1
+                               sigma(b2) = sigma(b2)+hmatel*coef(b1)
+                            end if
+                            
                          end if
                       end do
                    end do
@@ -350,22 +362,34 @@ module ci
                 do a=1,num_alpha
                    do b1=loc_arr(a),loc_arr(a+1)-1
                       call get_occupied(det(:,:,b1), N_int, noa, occ)
-                      do b2=loc_arr(a),loc_arr(a+1)-1
-                         if (b1==b2) cycle ! skip diagonal case
-                         if (exc_degree(det(:,2,b1),det(:,2,b2),N_int) <= 2) then
+                      do b2=b1+1,loc_arr(a+1)-1
+                         degree = exc_degree(det(:,2,b1),det(:,2,b2),N_int)
+                         if (degree <= 2) then
+                            
                             ! b1 connected to b2 by b or bb excitation
                             call get_excitation(det(:,:,b1),det(:,:,b2),exc,degree,phase,N_int)
                             if (degree==1) then
                                call slater1(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
                                ! sigma(b1) <- <b1|H|b2>*c_b2
                                sigma(b1) = sigma(b1)+hmatel*coef(b2)
-                               ! sigma(b2) <- <b2|H|b1>*c_b1
-                               sigma(b2) = sigma(b2)+hmatel*coef(b1)
                             else if (degree==2) then
                                call slater2(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
                                ! sigma(b1) <- <b1|H|b2>*c_b2
                                sigma(b1) = sigma(b1)+hmatel*coef(b2)
                             end if
+                            
+                            ! b2 connected to b1 by b or bb excitation
+                            call get_excitation(det(:,:,b2),det(:,:,b1),exc,degree,phase,N_int)
+                            if (degree==1) then
+                               call slater1(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
+                               ! sigma(b2) <- <b2|H|b1>*c_b1
+                               sigma(b2) = sigma(b2)+hmatel*coef(b1)
+                            else if (degree==2) then
+                               call slater2(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
+                               ! sigma(b2) <- <b2|H|b1>*c_b1
+                               sigma(b2) = sigma(b2)+hmatel*coef(b1)
+                            end if
+                            
                          end if
                       end do
                    end do
@@ -378,20 +402,32 @@ module ci
                 !
                 do a1=1,num_alpha
                    do a2=a1+1,num_alpha
+                      
                       ! get alpha excitation level between buckets
                       if (exc_degree(det(:,1,loc_arr(a1)),det(:,1,loc_arr(a2)),N_int) /= 1) cycle
+                      
                       do b1=loc_arr(a1),loc_arr(a1+1)-1
                          call get_occupied(det(:,:,b1), N_int, noa, occ)
                          do b2=loc_arr(a2),loc_arr(a2+1)-1
-                            if (exc_degree(det(:,2,b1),det(:,2,b2),N_int) == 1) then
+                            degree = exc_degree(det(:,2,b1),det(:,2,b2),N_int)
+                            if (degree == 1) then
+                               
                                ! b1 connected to b2 by ab excitations
                                call get_excitation(det(:,:,b1),det(:,:,b2),exc,degree,phase,N_int)
                                call slater2(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
                                ! sigma(b1) <- <b1|H|b2>*c_b2
                                sigma(b1) = sigma(b1)+hmatel*coef(b2)
+                               
+                               ! b2 connected to b1 by ab excitations
+                               call get_excitation(det(:,:,b2),det(:,:,b1),exc,degree,phase,N_int)
+                               call slater2(occ,noa,nob,mo_num,e1int,e2int,exc,phase,hmatel)
+                               ! sigma(b2) <- <b2|H|b1>*c_b1
+                               sigma(b2) = sigma(b2)+hmatel*coef(b1)
+                               
                             end if
                          end do
                       end do
+                      
                    end do
                 end do
                 deallocate(loc_arr)

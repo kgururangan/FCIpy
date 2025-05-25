@@ -1,9 +1,15 @@
 """Main calculation driver module of FCIpy."""
 
 import numpy as np
-from fcipy.interfaces import load_pyscf_integrals, load_gamess_integrals
+from fcipy.interfaces import load_pyscf_integrals, load_gamess_integrals, general_system
 
 class Driver:
+
+    @classmethod
+    def from_custom(cls, nelectrons, norbitals, nfrozen, ndelete, mult, e1int, e2int, nuclear_repulsion):
+        return cls(
+                    *general_system(nelectrons, norbitals, nfrozen, ndelete, mult, e1int, e2int, nuclear_repulsion)
+                  )
 
     @classmethod
     def from_pyscf(cls, meanfield, nfrozen, ndelete=0):
@@ -17,9 +23,8 @@ class Driver:
                     *load_gamess_integrals(logfile, fcidump, onebody, twobody, nfrozen, ndelete, multiplicity)
                    )
 
-    def __init__(self, system, e1int, e2int, herm=True):
+    def __init__(self, system, e1int, e2int):
         self.system = system
-        self.herm = herm
         self.e1int = e1int
         self.e2int = e2int
         self.coef = None
@@ -61,18 +66,18 @@ class Driver:
         else:
             print_ci_amplitudes_to_file(file, self.system, self.det, self.coef[:, state], thresh=prtol)
 
-    def run_ci(self, nroot, convergence=1.0e-08, max_size=30, maxit=200, opt=True, prtol=0.09):
+    def run_ci(self, nroot, convergence=1.0e-08, max_size=30, maxit=200, opt=True, herm=True, prtol=0.09):
         from fcipy.davidson import run_davidson, run_davidson_opt
         if opt:
             # for now, the sorting routine in the optimized CI requires that N_int = 1
             assert self.N_int == 1
-            self.det, self.total_energy, self.coef = run_davidson_opt(self.system, self.det, self.num_alpha, self.num_beta, self.e1int, self.e2int, nroot,
-                                                                      convergence=convergence, max_size=max_size, maxit=maxit, print_thresh=prtol, herm=self.herm)
+            self.det, self.total_energy, self.coef = run_davidson_opt(self.system, self.det, self.num_alpha, self.num_beta, self.e1int, self.e2int, self.coef, self.total_energy,
+                                                                      nroot, convergence=convergence, max_size=max_size, maxit=maxit, herm=herm, print_thresh=prtol)
         else:
-            self.total_energy, self.coef = run_davidson(self.system, self.det, self.e1int, self.e2int, nroot,
-                                                        convergence=convergence, max_size=max_size, maxit=maxit, print_thresh=prtol, herm=self.herm)
+            self.total_energy, self.coef = run_davidson(self.system, self.det, self.e1int, self.e2int, self.coef, self.total_energy, nroot,
+                                                        convergence=convergence, max_size=max_size, maxit=maxit, herm=herm, print_thresh=prtol)
 
-    def build_hamiltonian(self, opt=True):
+    def build_hamiltonian(self, opt=True, herm=True):
         from fcipy.hamiltonian import build_hamiltonian
         # if opt:
         #     # for now, the sorting routine in the optimized CI requires that N_int = 1
@@ -80,14 +85,14 @@ class Driver:
         #     print(self.det.shape)
         #     self.det, self.Hmat = build_hamiltonian_opt(self.det, self.num_alpha, self.num_beta, self.e1int, self.e2int, self.system.noccupied_alpha, self.system.noccupied_beta, self.system.reference_energy)
         # else:
-        self.Hmat = build_hamiltonian(self.det, self.e1int, self.e2int, self.system.noccupied_alpha, self.system.noccupied_beta, herm=self.herm)
+        self.Hmat = build_hamiltonian(self.det, self.e1int, self.e2int, self.system.noccupied_alpha, self.system.noccupied_beta, herm=herm)
 
-    def diagonalize_hamiltonian(self, opt=True):
+    def diagonalize_hamiltonian(self, opt=True, herm=True):
 
         if self.Hmat is None:
             self.build_hamiltonian(opt=opt)
 
-        if self.herm:
+        if herm:
             self.total_energy, self.coef = np.linalg.eigh(self.Hmat)
         else:
             self.total_energy, self.coef = np.linalg.eig(self.Hmat)
