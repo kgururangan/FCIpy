@@ -16,7 +16,7 @@ def print_ci_amplitudes(system, det, coef, thresh):
     noa = system.noccupied_alpha
     nob = system.noccupied_beta
     idx = np.argsort(np.abs(coef))
-    print("\n   Largest CI Amplitudes")
+    print("   Largest CI Amplitudes")
     for n, i in enumerate(reversed(idx)):
         if abs(coef[i]) < thresh: continue
         occ = ci.ci.get_occupied(det[:, :, i], noa)

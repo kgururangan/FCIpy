@@ -6,9 +6,9 @@ from fcipy.interfaces import load_pyscf_integrals, load_gamess_integrals, genera
 class Driver:
 
     @classmethod
-    def from_custom(cls, nelectrons, norbitals, nfrozen, ndelete, mult, e1int, e2int, nuclear_repulsion):
+    def from_custom(cls, nelectrons, norbitals, nfrozen, ndelete, mult, e1int, e2int, nuclear_repulsion, point_group, orbital_symmetry):
         return cls(
-                    *general_system(nelectrons, norbitals, nfrozen, ndelete, mult, e1int, e2int, nuclear_repulsion)
+                    *general_system(nelectrons, norbitals, nfrozen, ndelete, mult, e1int, e2int, nuclear_repulsion, point_group, orbital_symmetry)
                   )
 
     @classmethod
@@ -78,14 +78,11 @@ class Driver:
             self.total_energy, self.state_eigval, self.coef = run_davidson(self.system, self.det, self.e1int, self.e2int, self.coef, nroot,
                                                         convergence=convergence, max_size=max_size, maxit=maxit, herm=herm, print_thresh=prtol)
 
-    def build_hamiltonian(self, herm=True):
+    def build_hamiltonian(self, opt=True, herm=True):
         from fcipy.hamiltonian import build_hamiltonian
         self.Hmat = build_hamiltonian(self.det, self.e1int, self.e2int, self.system.noccupied_alpha, self.system.noccupied_beta, herm=herm)
 
-    def diagonalize_hamiltonian(self, opt=True, herm=True):
-
-        if self.Hmat is None:
-            self.build_hamiltonian()
+    def diagonalize_hamiltonian(self, herm=True):
 
         if herm:
             self.state_eigval, self.coef = np.linalg.eigh(self.Hmat)

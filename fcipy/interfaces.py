@@ -5,7 +5,7 @@ from fcipy.system import System
 eVtohartree = 0.036749308136649
 hartreetoeV = 1.0/(eVtohartree)
 
-def general_system(nelectrons, norbitals, nfrozen, ndelete, mult, e1int, e2int, nuclear_repulsion):
+def general_system(nelectrons, norbitals, nfrozen, ndelete, mult, e1int, e2int, nuclear_repulsion, point_group, orbital_symmetries):
     """Builds the System and Integral objects using minimal information from a general/custom system.
 
     Arguments:
@@ -24,8 +24,8 @@ def general_system(nelectrons, norbitals, nfrozen, ndelete, mult, e1int, e2int, 
         mult,  # PySCF mol.spin returns 2S, not S
         nfrozen,
         ndelete=ndelete,
-        point_group="C1",
-        orbital_symmetries=['A' for _ in range(norbitals)],
+        point_group=point_group,
+        orbital_symmetries=orbital_symmetries,
         charge=0,
         nuclear_repulsion=nuclear_repulsion,
     )
