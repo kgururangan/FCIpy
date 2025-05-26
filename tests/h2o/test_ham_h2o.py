@@ -19,7 +19,7 @@ def test_ci_h2o():
                                     nfrozen=0)
 
         # read the determinants
-        driver.load_determinants(file=TEST_DATA_DIR + f"data/psi_det_{ndet}")
+        driver.load_determinants(file=TEST_DATA_DIR + f"/psi_det_{ndet}")
 
         # run Hamiltonian diagonalization
         driver.build_hamiltonian(opt=False, herm=True)

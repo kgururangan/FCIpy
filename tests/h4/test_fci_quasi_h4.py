@@ -29,7 +29,8 @@ def test_fci_h4():
         driver.load_determinants(max_excit_rank=-1, target_irrep="AG")
 
         # perform a dense diagonalization of the full FCI Hamiltonian
-        driver.diagonalize_hamiltonian()
+        driver.build_hamiltonian(herm=True)
+        driver.diagonalize_hamiltonian(herm=True)
 
         for i, e in enumerate(driver.total_energy[:20]):
                print(f"root {i}, E = {e}")
