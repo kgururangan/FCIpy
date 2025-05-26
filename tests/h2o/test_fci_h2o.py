@@ -8,7 +8,7 @@ def test_fci_h2o():
             ["H", (0, -1.515263, -1.058898)],
             ["O", (0.0, 0.0, -0.0090)]]
 
-    mol = gto.M(atom=geom, basis="6-31g", spin=0, charge=0, unit="Bohr", symmetry="C2V")
+    mol = gto.M(atom=geom, basis="sto-3g", spin=0, charge=0, unit="Bohr", symmetry="C2V")
     mf = scf.RHF(mol)
     mf.kernel()
 
@@ -36,36 +36,19 @@ def test_fci_h2o():
     driver.load_determinants(max_excit_rank=-1, target_irrep="A1")
 
     # run CI calculation
-    driver.run_ci(nroot=1, prtol=0.01)
+    driver.run_ci(nroot=1, prtol=0.01, herm=True)
 
     # compute the 1-RDM
-    driver.build_rdm1s()
+    driver.build_rdm1s(i=0)
     # compute the 2-RDM
-    driver.build_rdm2s()
+    driver.build_rdm2s(i=0)
     # compute the 3-RDM
-    driver.build_rdm3s()
-
-    #print("Natural occupation numbers:")
-    #for i, n in enumerate(driver.nat_occ_num[0]):
-    #    print(f"Orbital {i + 1}: {n}")
+    driver.build_rdm3s(i=0)
 
     # check the results
     assert np.allclose(driver.total_energy[0], expected_energy)
     for key, value in driver.rdms[0].items():
-        print(f"error in rdm({key}): {np.linalg.norm(value.flatten() - expected_rdms[key].flatten())}")
-
-    M = driver.system.norbitals
-    dm = driver.rdms[0]['aab']
-    dme = dm3aab
-    for p in range(M):
-        for q in range(p, M):
-            for r in range(M):
-                for s in range(M):
-                    for t in range(s, M):
-                        for u in range(M):
-                            if abs(dm[p,q,r,s,t,u] - dme[p,q,r,s,t,u]) > 1.0e-06:
-                                print(f"{p} {q} {r} {s} {t} {u}: {dm[p,q,r,s,t,u]}  {dme[p,q,r,s,t,u]}")
-
+        assert np.allclose(np.linalg.norm(value.flatten() - expected_rdms[key].flatten()), 0.0, atol=1.0e-08, rtol=1.0e-08)
 
 
 if __name__ == "__main__":
