@@ -60,6 +60,9 @@ def load_pyscf_integrals(meanfield, nfrozen=0, ndelete=0):
     norbitals = mo_coeff.shape[1]
     nuclear_repulsion = molecule.energy_nuc()
 
+    if molecule.topgroup != molecule.groupname:
+        print(f"   Note: System possess higher {molecule.topgroup} symmetry, but we are using {molecule.groupname}")
+
     system = System(
         nelectrons,
         norbitals,
