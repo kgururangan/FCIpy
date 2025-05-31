@@ -1,6 +1,7 @@
 """Main calculation driver module of FCIpy."""
 
 import numpy as np
+import scipy
 from fcipy.interfaces import load_pyscf_integrals, load_gamess_integrals, general_system
 
 class Driver:
@@ -28,6 +29,7 @@ class Driver:
         self.e1int = e1int
         self.e2int = e2int
         self.coef = None
+        self.coef_left = None
         self.total_energy = None
         self.state_eigval = None
         self.det = None
@@ -85,12 +87,16 @@ class Driver:
     def diagonalize_hamiltonian(self, herm=True):
 
         if herm:
-            self.state_eigval, self.coef = np.linalg.eigh(self.Hmat)
+            # self.state_eigval, self.coef = np.linalg.eigh(self.Hmat)
+            self.state_eigval, self.coef = scipy.linalg.eigh(self.Hmat)
+            self.coef_left = self.coef.copy()
         else:
-            self.state_eigval, self.coef = np.linalg.eig(self.Hmat)
+            # self.state_eigval, self.coef = np.linalg.eig(self.Hmat)
+            self.state_eigval, self.coef_left, self.coef = scipy.linalg.eig(self.Hmat, left=True)
             idx = np.argsort(self.total_energy)
             self.state_eigval = self.state_eigval[idx]
             self.coef = self.coef[:, idx]
+            self.coef_left = self.coef_left[:, idx]
 
         self.total_energy = self.state_eigval + self.system.frozen_energy + self.system.nuclear_repulsion
 
@@ -120,20 +126,37 @@ class Driver:
     def build_rdm1s(self, i=0):
         from fcipy.density import compute_rdm1s
 
-        dm1a, dm1b = compute_rdm1s(self.det, self.coef[:, i], self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
+        if self.coef_left is None:
+            vL = self.coef[:, i]
+        else:
+            vL = self.coef_left[:, i]
+
+        dm1a, dm1b = compute_rdm1s(self.det, self.coef[:, i], vL, self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
         self.rdms[i]['a'] = dm1a
         self.rdms[i]['b'] = dm1b
 
     def build_rdm2s(self, i=0):
         from fcipy.density import compute_rdm2s
-        dm2aa, dm2ab, dm2bb = compute_rdm2s(self.det, self.coef[:, i], self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
+
+        if self.coef_left is None:
+            vL = self.coef[:, i]
+        else:
+            vL = self.coef_left[:, i]
+
+        dm2aa, dm2ab, dm2bb = compute_rdm2s(self.det, self.coef[:, i], vL, self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
         self.rdms[i]['aa'] = dm2aa
         self.rdms[i]['ab'] = dm2ab
         self.rdms[i]['bb'] = dm2bb
 
     def build_rdm3s(self, i):
         from fcipy.density import compute_rdm3s
-        dm3aaa, dm3aab, dm3abb, dm3bbb = compute_rdm3s(self.det, self.coef[:, i], self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
+
+        if self.coef_left is None:
+            vL = self.coef[:, i]
+        else:
+            vL = self.coef_left[:, i]
+
+        dm3aaa, dm3aab, dm3abb, dm3bbb = compute_rdm3s(self.det, self.coef[:, i], vL, self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
         self.rdms[i]['aaa'] = dm3aaa
         self.rdms[i]['aab'] = dm3aab
         self.rdms[i]['abb'] = dm3abb
@@ -143,9 +166,14 @@ class Driver:
         from fcipy.density import compute_rdm1s, compute_rdm2s, compute_rdm3s
         rdms_i = {}
 
-        rdms_i['a'], rdms_i['b'] = compute_rdm1s(self.det, self.coef[:, i], self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
-        rdms_i['aa'], rdms_i['ab'], rdms_i['bb'] = compute_rdm2s(self.det, self.coef[:, i], self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
-        rdms_i['aaa'], rdms_i['aab'], rdms_i['abb'], rdms_i['bbb'] = compute_rdm3s(self.det, self.coef[:, i], self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
+        if self.coef_left is None:
+            vL = self.coef[:, i]
+        else:
+            vL = self.coef_left[:, i]
+
+        rdms_i['a'], rdms_i['b'] = compute_rdm1s(self.det, self.coef[:, i], vL, self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
+        rdms_i['aa'], rdms_i['ab'], rdms_i['bb'] = compute_rdm2s(self.det, self.coef[:, i], vL, self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
+        rdms_i['aaa'], rdms_i['aab'], rdms_i['abb'], rdms_i['bbb'] = compute_rdm3s(self.det, self.coef[:, i], vL, self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
 
         return rdms_i
 

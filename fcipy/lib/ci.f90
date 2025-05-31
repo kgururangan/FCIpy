@@ -1541,11 +1541,12 @@ module ci
 
         end
 
-        subroutine compute_rdm1s(det,Ndet,coef,mo_num,noa,nob,&
+        subroutine compute_rdm1s(det,Ndet,coef,coef_left,mo_num,noa,nob,&
                                  Nint,rdm1a,rdm1b)
          integer*8, intent(in)         :: det(Nint,2,Ndet)
          integer, intent(in)           :: Ndet, Nint, mo_num, noa, nob
          double precision, intent(in)  :: coef(Ndet)
+         double precision, intent(in)  :: coef_left(Ndet)
          double precision, intent(out) :: rdm1a(mo_num,mo_num)
          double precision, intent(out) :: rdm1b(mo_num,mo_num)
 
@@ -1560,7 +1561,7 @@ module ci
          rdm1b = 0.d0
          do k=1,Ndet
           det_I = det(:,:,k)
-          c = coef(k)*coef(k)
+          c = coef_left(k)*coef(k)
           call get_occupied(det_I,Nint,noa,occ)
           !
           ! diagonal: <I|p+ q|I>
@@ -1580,7 +1581,7 @@ module ci
            det_J = det(:,:,l)
            call get_excitation(det_I,det_J,exc,deg,phase,Nint)
            if (deg /= 1) cycle
-           c = phase*coef(k)*coef(l)
+           c = phase*coef_left(k)*coef(l)
            if (exc(0,1,1) == 1) then ! a -> a
              i = exc(1,1,1)
              j = exc(1,2,1)
@@ -1596,11 +1597,11 @@ module ci
          end do
         end
 
-        subroutine compute_rdm2s(det,Ndet,coef,mo_num,noa,nob,&
+        subroutine compute_rdm2s(det,Ndet,coef,coef_left,mo_num,noa,nob,&
                                  Nint,rdm2a,rdm2b,rdm2c)
          integer*8, intent(in)         :: det(Nint,2,Ndet)
          integer, intent(in)           :: Ndet, Nint, mo_num, noa, nob
-         double precision, intent(in)  :: coef(Ndet)
+         double precision, intent(in)  :: coef(Ndet), coef_left(Ndet)
          double precision, intent(out) :: rdm2a(mo_num,mo_num,mo_num,mo_num)
          double precision, intent(out) :: rdm2b(mo_num,mo_num,mo_num,mo_num)
          double precision, intent(out) :: rdm2c(mo_num,mo_num,mo_num,mo_num)
@@ -1616,7 +1617,7 @@ module ci
          rdm2c = 0.d0
          do n=1,Ndet
             call get_occupied(det(:,:,n), Nint, noa, occ)
-            c = coef(n)*coef(n)
+            c = coef_left(n)*coef(n)
             !
             ! Diagonal
             !
@@ -1653,7 +1654,7 @@ module ci
             do m=1,Ndet
                call get_excitation(det(:,:,n),det(:,:,m),exc,degree,phase,Nint)
                if (degree >= 3 .or. degree==0) cycle
-               c = coef(n)*coef(m)
+               c = coef_left(n)*coef(m)
                cp = phase*c
                if (degree==1) then ! single excitation
                   if (exc(0,1,1)==1) then ! single excitation is a->a
@@ -1720,11 +1721,11 @@ module ci
          end do
         end
 
-        subroutine compute_rdm3s(det,Ndet,coef,mo_num,noa,nob,&
+        subroutine compute_rdm3s(det,Ndet,coef,coef_left,mo_num,noa,nob,&
                                  Nint,rdm3a,rdm3b,rdm3c,rdm3d)
          integer*8, intent(in)         :: det(Nint,2,Ndet)
          integer, intent(in)           :: Ndet, Nint, mo_num, noa, nob
-         double precision, intent(in)  :: coef(Ndet)
+         double precision, intent(in)  :: coef(Ndet), coef_left(Ndet)
          double precision, intent(out) :: rdm3a(mo_num,mo_num,mo_num,mo_num,mo_num,mo_num)
          double precision, intent(out) :: rdm3b(mo_num,mo_num,mo_num,mo_num,mo_num,mo_num)
          double precision, intent(out) :: rdm3c(mo_num,mo_num,mo_num,mo_num,mo_num,mo_num)
@@ -1742,7 +1743,7 @@ module ci
          rdm3d = 0.d0
          do n=1,Ndet
             call get_occupied(det(:,:,n), Nint, noa, occ)
-            c = coef(n)*coef(n)
+            c = coef_left(n)*coef(n)
             !
             ! Diagonal
             !
@@ -1874,7 +1875,7 @@ module ci
             do m=1,Ndet
                call get_excitation3(det(:,:,n),det(:,:,m),exc,degree,phase,Nint)
                if (degree >= 4 .or. degree==0) cycle
-               c = coef(n)*coef(m)
+               c = coef_left(n)*coef(m)
                cp = phase*c
                if (degree==1) then ! single excitation
                   if (exc(0,1,1)==1) then ! single excitation is a->a
