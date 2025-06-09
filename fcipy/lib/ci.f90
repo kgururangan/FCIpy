@@ -1577,7 +1577,8 @@ module ci
           !
           ! off-diagonal: <J|p+ q|I>
           !
-          do l=1,k-1
+          do l=1,Ndet
+           if (k==l) cycle
            det_J = det(:,:,l)
            call get_excitation(det_I,det_J,exc,deg,phase,Nint)
            if (deg /= 1) cycle
@@ -1586,12 +1587,10 @@ module ci
              i = exc(1,1,1)
              j = exc(1,2,1)
              rdm1a(j,i) = rdm1a(j,i) + c
-             rdm1a(i,j) = rdm1a(i,j) + c
            else ! b -> b
              i = exc(1,1,2)
              j = exc(1,2,2)
              rdm1b(j,i) = rdm1b(j,i) + c
-             rdm1b(i,j) = rdm1b(i,j) + c
            end if
           end do
          end do

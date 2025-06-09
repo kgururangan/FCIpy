@@ -87,16 +87,24 @@ class Driver:
     def diagonalize_hamiltonian(self, herm=True):
 
         if herm:
-            # self.state_eigval, self.coef = np.linalg.eigh(self.Hmat)
             self.state_eigval, self.coef = scipy.linalg.eigh(self.Hmat)
             self.coef_left = self.coef.copy()
         else:
-            # self.state_eigval, self.coef = np.linalg.eig(self.Hmat)
-            self.state_eigval, self.coef_left, self.coef = scipy.linalg.eig(self.Hmat, left=True)
-            idx = np.argsort(self.total_energy)
+            self.state_eigval, self.coef_left, self.coef = scipy.linalg.eig(self.Hmat, right=True, left=True)
+            idx = np.argsort(self.state_eigval)
             self.state_eigval = self.state_eigval[idx]
             self.coef = self.coef[:, idx]
             self.coef_left = self.coef_left[:, idx]
+
+            # Biorthonormalize L and R manually
+            M = np.conj(self.coef_left).T @ self.coef
+            M_L, M_U = scipy.linalg.lu(M, permute_l=True, overwrite_a=True, check_finite=False)
+            self.coef_left = scipy.linalg.inv(M_L, overwrite_a=True, check_finite=False) @ self.coef_left
+            self.coef = self.coef @ scipy.linalg.inv(M_U, overwrite_a=True, check_finite=False)
+
+            # Check biorthonormality
+            LR = np.dot(np.conj(self.coef_left).T, self.coef)
+            assert np.allclose(LR, np.eye(self.coef.shape[1]), atol=1.0e-09, rtol=1.0e-09), "Left- and right-eigenvectors of non-Hermitian Hamiltonian are not biorthonormal!"
 
         self.total_energy = self.state_eigval + self.system.frozen_energy + self.system.nuclear_repulsion
 
