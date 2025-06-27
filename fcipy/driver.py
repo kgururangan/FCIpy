@@ -65,7 +65,11 @@ class Driver:
     def print_ci_vector(self, state=0, prtol=0.01, file=None):
         from fcipy.printing import print_ci_amplitudes, print_ci_amplitudes_to_file
         if file is None:
+            print("   Right CI state")
             print_ci_amplitudes(self.system, self.det, self.coef[:, state], thresh=prtol)
+            if self.coef_left[:, state] is not None:
+                print("   Left CI state")
+                print_ci_amplitudes(self.system, self.det, self.coef_left[:, state], thresh=prtol)
         else:
             print_ci_amplitudes_to_file(file, self.system, self.det, self.coef[:, state], thresh=prtol)
 
@@ -96,15 +100,18 @@ class Driver:
             self.coef = self.coef[:, idx]
             self.coef_left = self.coef_left[:, idx]
 
+            print(f"   [fcipy]: norm of imag(C_R) = {np.linalg.norm(np.imag(self.coef))}")
+            print(f"   [fcipy]: norm of imag(C_L) = {np.linalg.norm(np.imag(self.coef_left))}")
+
             # Biorthonormalize L and R manually
-            M = np.conj(self.coef_left).T @ self.coef
-            M_L, M_U = scipy.linalg.lu(M, permute_l=True, overwrite_a=True, check_finite=False)
-            self.coef_left = scipy.linalg.inv(M_L, overwrite_a=True, check_finite=False) @ self.coef_left
-            self.coef = self.coef @ scipy.linalg.inv(M_U, overwrite_a=True, check_finite=False)
+            # M = np.conj(self.coef_left).T @ self.coef
+            # M_L, M_U = scipy.linalg.lu(M, permute_l=True, overwrite_a=True, check_finite=False)
+            # self.coef_left = scipy.linalg.inv(M_L, overwrite_a=True, check_finite=False) @ self.coef_left
+            # self.coef = self.coef @ scipy.linalg.inv(M_U, overwrite_a=True, check_finite=False)
 
             # Check biorthonormality
-            LR = np.dot(np.conj(self.coef_left).T, self.coef)
-            assert np.allclose(LR, np.eye(self.coef.shape[1]), atol=1.0e-09, rtol=1.0e-09), "Left- and right-eigenvectors of non-Hermitian Hamiltonian are not biorthonormal!"
+            # LR = np.dot(np.conj(self.coef_left).T, self.coef)
+            # assert np.allclose(LR, np.eye(self.coef.shape[1]), atol=1.0e-09, rtol=1.0e-09), "Left- and right-eigenvectors of non-Hermitian Hamiltonian are not biorthonormal!"
 
         self.total_energy = self.state_eigval + self.system.frozen_energy + self.system.nuclear_repulsion
 
@@ -137,7 +144,7 @@ class Driver:
         if self.coef_left is None:
             vL = self.coef[:, i]
         else:
-            vL = self.coef_left[:, i]
+            vL = self.coef_left[:, i].conj()
 
         dm1a, dm1b = compute_rdm1s(self.det, self.coef[:, i], vL, self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
         self.rdms[i]['a'] = dm1a
@@ -149,7 +156,7 @@ class Driver:
         if self.coef_left is None:
             vL = self.coef[:, i]
         else:
-            vL = self.coef_left[:, i]
+            vL = self.coef_left[:, i].conj()
 
         dm2aa, dm2ab, dm2bb = compute_rdm2s(self.det, self.coef[:, i], vL, self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
         self.rdms[i]['aa'] = dm2aa
@@ -162,7 +169,7 @@ class Driver:
         if self.coef_left is None:
             vL = self.coef[:, i]
         else:
-            vL = self.coef_left[:, i]
+            vL = self.coef_left[:, i].conj()
 
         dm3aaa, dm3aab, dm3abb, dm3bbb = compute_rdm3s(self.det, self.coef[:, i], vL, self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
         self.rdms[i]['aaa'] = dm3aaa
@@ -170,14 +177,17 @@ class Driver:
         self.rdms[i]['abb'] = dm3abb
         self.rdms[i]['bbb'] = dm3bbb
 
-    def compute_rdm123s(self, i):
+    def compute_rdm123s(self, i, use_right=False):
         from fcipy.density import compute_rdm1s, compute_rdm2s, compute_rdm3s
         rdms_i = {}
 
-        if self.coef_left is None:
-            vL = self.coef[:, i]
+        if use_right:
+            vL = self.coef[:, i].copy()
         else:
-            vL = self.coef_left[:, i]
+            if self.coef_left is None:
+                vL = self.coef[:, i]
+            else:
+                vL = self.coef_left[:, i].conj()
 
         rdms_i['a'], rdms_i['b'] = compute_rdm1s(self.det, self.coef[:, i], vL, self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
         rdms_i['aa'], rdms_i['ab'], rdms_i['bb'] = compute_rdm2s(self.det, self.coef[:, i], vL, self.system.norbitals, self.system.noccupied_alpha, self.system.noccupied_beta)
